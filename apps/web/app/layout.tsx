@@ -6,6 +6,7 @@ import { ClientProviders } from '../components/ClientProviders';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { Breadcrumb } from '../components/Breadcrumb';
+import { MobileBottomNav } from '../components/MobileBottomNav';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -24,13 +25,14 @@ export default function RootLayout({
       <body className={`${inter.className} bg-gray-50 text-gray-900 antialiased min-h-full`}>
         <Suspense fallback={null}>
           <ClientProviders>
-            <div className="flex min-h-screen flex-col">
+            <div className="flex min-h-screen flex-col pb-16 lg:pb-0">
               <Header />
               <Breadcrumb />
               <main className="flex-1 w-full">
                 {children}
               </main>
               <Footer />
+              <MobileBottomNav />
             </div>
           </ClientProviders>
         </Suspense>

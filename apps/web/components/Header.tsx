@@ -7,6 +7,7 @@ import { getStoredCurrency, setStoredCurrency, type CurrencyCode, CURRENCIES, fo
 import { getStoredLanguage, setStoredLanguage } from '../lib/language';
 import { useAuth } from '../lib/auth/AuthContext';
 import { apiClient } from '../lib/api-client';
+import { CART_KEY, getCompareCount, getWishlistCount } from '../lib/storageCounts';
 import { GoogleTranslate } from './GoogleTranslate';
 import contactData from '../../../config/contact.json';
 import { Instagram, Facebook, Linkedin } from 'lucide-react';
@@ -110,30 +111,6 @@ const BadgeIcon = ({ icon, badge = 0, className = '', iconClassName = '' }: Badg
     )}
   </div>
 );
-
-const WISHLIST_KEY = 'shop_wishlist';
-const COMPARE_KEY = 'shop_compare';
-const CART_KEY = 'shop_cart_guest';
-
-function getWishlistCount(): number {
-  if (typeof window === 'undefined') return 0;
-  try {
-    const stored = localStorage.getItem(WISHLIST_KEY);
-    return stored ? JSON.parse(stored).length : 0;
-  } catch {
-    return 0;
-  }
-}
-
-function getCompareCount(): number {
-  if (typeof window === 'undefined') return 0;
-  try {
-    const stored = localStorage.getItem(COMPARE_KEY);
-    return stored ? JSON.parse(stored).length : 0;
-  } catch {
-    return 0;
-  }
-}
 
 /**
  * Component that syncs search params with state

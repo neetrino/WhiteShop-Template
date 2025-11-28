@@ -11,6 +11,9 @@ import { ProductsHeader } from '../../components/ProductsHeader';
 import { ProductsGrid } from '../../components/ProductsGrid';
 import { CategoryNavigation } from '../../components/CategoryNavigation';
 import { MobileFiltersDrawer } from '../../components/MobileFiltersDrawer';
+import { MOBILE_FILTERS_EVENT } from '../../lib/events';
+
+const PAGE_CONTAINER = 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8';
 
 interface Product {
   id: string;
@@ -36,6 +39,9 @@ interface ProductsResponse {
   };
 }
 
+/**
+ * Մատչելի API-ից բերում է ապրանքների ցանկը՝ կիրառելով բոլոր ֆիլտրերը։
+ */
 async function getProducts(
   page: number = 1,
   search?: string,
@@ -101,6 +107,9 @@ async function getProducts(
 }
 
 
+/**
+ * Ցուցադրում է ապրանքների գլխավոր էջը՝ ֆիլտրերով և գրաֆիկով։
+ */
 export default async function ProductsPage({
   searchParams,
 }: {
@@ -143,15 +152,17 @@ export default async function ProductsPage({
 
   return (
     <div className="w-full">
-      {/* Category Navigation */}
-      <CategoryNavigation />
-      
-      {/* Header with Breadcrumb, View Mode, and Sort */}
-      <ProductsHeader />
+      <div className={PAGE_CONTAINER}>
+        {/* Category Navigation */}
+        <CategoryNavigation />
+        
+        {/* Header with Breadcrumb, View Mode, and Sort */}
+        <ProductsHeader />
+      </div>
 
-      <div className="flex gap-8 pl-4 sm:pl-8 lg:pl-8">
+      <div className={`${PAGE_CONTAINER} flex gap-8`}>
         {/* Left Sidebar - Filters (aligned with logo direction) */}
-        <aside className="w-64 flex-shrink-0 hidden lg:block bg-gray-50 min-h-screen ml-36 lg:ml-42">
+        <aside className="w-64 flex-shrink-0 hidden lg:block bg-gray-50 min-h-screen rounded-xl">
           <div className="sticky top-4 p-4 space-y-6">
             <PriceFilter currentMinPrice={minPrice} currentMaxPrice={maxPrice} category={category} search={search} />
             <ColorFilter 
@@ -179,10 +190,10 @@ export default async function ProductsPage({
         </aside>
 
         {/* Main Content - Products */}
-        <div className="flex-1 min-w-0 py-4 pr-4 sm:pr-6 lg:pr-8">
+        <div className="flex-1 min-w-0 py-4">
             {/* Mobile Filter Drawer */}
             <div className="mb-6">
-              <MobileFiltersDrawer triggerLabel="Filters">
+              <MobileFiltersDrawer triggerLabel="Filters" openEventName={MOBILE_FILTERS_EVENT}>
                 <PriceFilter currentMinPrice={minPrice} currentMaxPrice={maxPrice} category={category} search={search} />
                 <ColorFilter 
                   category={category} 

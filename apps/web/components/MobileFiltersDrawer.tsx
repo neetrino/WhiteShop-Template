@@ -6,12 +6,17 @@ interface MobileFiltersDrawerProps {
   title?: string;
   triggerLabel?: string;
   children: React.ReactNode;
+  openEventName?: string;
 }
 
+/**
+ * Mobile filters drawer that կարող է բացվել թե՛ կոճակից, թե՛ արտաքին իրադարձությունից։
+ */
 export function MobileFiltersDrawer({
   title = 'Filters',
   triggerLabel = 'Filters',
   children,
+  openEventName,
 }: MobileFiltersDrawerProps) {
   const [open, setOpen] = useState(false);
 
@@ -25,6 +30,20 @@ export function MobileFiltersDrawer({
       document.body.style.overflow = '';
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!openEventName) return;
+
+    const handleExternalToggle = () => {
+      console.debug('[MobileFiltersDrawer] external toggle received');
+      setOpen((prev) => !prev);
+    };
+
+    window.addEventListener(openEventName, handleExternalToggle);
+    return () => {
+      window.removeEventListener(openEventName, handleExternalToggle);
+    };
+  }, [openEventName]);
 
   return (
     <div className="lg:hidden">
