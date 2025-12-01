@@ -634,6 +634,48 @@ export function Header() {
                 </span>
               </Link>
             </div>
+            {/* Mobile Currency and Language - on same line as logo */}
+            <div className="flex items-center gap-2 md:hidden">
+              {/* Currency Switcher */}
+              <div className="relative" ref={mobileCurrencyRef}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMobileCurrency(!showMobileCurrency);
+                  }}
+                  className="flex h-10 items-center justify-center gap-1 rounded-full border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors cursor-pointer"
+                >
+                  <span className="text-sm font-medium">{selectedCurrency}</span>
+                  <ChevronDownIcon />
+                </button>
+                {showMobileCurrency && (
+                  <div className="absolute top-full right-0 mt-2 w-40 bg-white rounded-xl shadow-2xl border border-gray-200/80 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                    {Object.values(CURRENCIES).map((currency) => (
+                      <button
+                        key={currency.code}
+                        onClick={() => {
+                          handleCurrencyChange(currency.code);
+                          setShowMobileCurrency(false);
+                        }}
+                        className={`w-full text-left px-4 py-2.5 text-sm transition-all duration-150 ${selectedCurrency === currency.code
+                            ? 'bg-gradient-to-r from-gray-100 to-gray-50 text-gray-900 font-semibold'
+                            : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span>{currency.code}</span>
+                          <span className="text-gray-500">{currency.symbol}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {/* Language Switcher */}
+              <div className="flex h-10 items-center justify-center">
+                <GoogleTranslate />
+              </div>
+            </div>
           </div>
 
           {/* Navigation Links - Centered */}
@@ -703,48 +745,6 @@ export function Header() {
             </Link>
           </nav>
 
-          {/* Mobile primary action */}
-          <div className="ml-auto flex items-center gap-2 md:hidden">
-            {/* Currency Switcher */}
-            <div className="relative" ref={mobileCurrencyRef}>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowMobileCurrency(!showMobileCurrency);
-                }}
-                className="flex h-10 items-center justify-center gap-1 rounded-full border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors cursor-pointer"
-              >
-                <span className="text-sm font-medium">{selectedCurrency}</span>
-                <ChevronDownIcon />
-              </button>
-              {showMobileCurrency && (
-                <div className="absolute top-full right-0 mt-2 w-40 bg-white rounded-xl shadow-2xl border border-gray-200/80 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                  {Object.values(CURRENCIES).map((currency) => (
-                    <button
-                      key={currency.code}
-                      onClick={() => {
-                        handleCurrencyChange(currency.code);
-                        setShowMobileCurrency(false);
-                      }}
-                      className={`w-full text-left px-4 py-2.5 text-sm transition-all duration-150 ${selectedCurrency === currency.code
-                          ? 'bg-gradient-to-r from-gray-100 to-gray-50 text-gray-900 font-semibold'
-                          : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span>{currency.code}</span>
-                        <span className="text-gray-500">{currency.symbol}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            {/* Language Switcher */}
-            <div className="flex h-10 items-center justify-center">
-              <GoogleTranslate />
-            </div>
-          </div>
 
           {/* Right Side Actions - Icons Only */}
           <div className="ml-auto hidden items-center gap-2 md:flex">

@@ -63,14 +63,6 @@ export function MobileBottomNav() {
           window.dispatchEvent(new Event(MOBILE_FILTERS_EVENT));
         },
       },
-      // On mobile we show Cart instead of Wishlist
-      { 
-        label: 'Cart', 
-        href: '/cart', 
-        icon: ShoppingCart, 
-        visible: true,
-      },
-      { label: 'My account', href: '/profile', icon: UserRound, visible: true },
       // Shop with Store icon
       { 
         label: 'Shop', 
@@ -78,6 +70,14 @@ export function MobileBottomNav() {
         icon: Store, 
         visible: true,
         onClick: () => console.info('🛒 [MobileBottomNav] Shop tapped, navigating to /products'),
+      },
+      { label: 'My account', href: '/profile', icon: UserRound, visible: true },
+      // On mobile we show Cart instead of Wishlist
+      { 
+        label: 'Cart', 
+        href: '/cart', 
+        icon: ShoppingCart, 
+        visible: true,
       },
     ],
     [isProductsPage]
