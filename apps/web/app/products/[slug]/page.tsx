@@ -124,7 +124,13 @@ export default function ProductPage({ params }: ProductPageProps) {
   
   // In Next.js 15, params is always a Promise for dynamic routes
   const resolvedParams = use(params);
-  const slug = resolvedParams?.slug ?? '';
+  const rawSlug = resolvedParams?.slug ?? '';
+  
+  // Extract product slug from URL (remove variant ID if present, e.g., "ssxcad:1" -> "ssxcad")
+  // Variant ID format: "slug:variantId" or "slug:variantIndex"
+  const slugParts = rawSlug.includes(':') ? rawSlug.split(':') : [rawSlug];
+  const slug = slugParts[0];
+  const variantIdFromUrl = slugParts.length > 1 ? slugParts[1] : null;
 
   // Check if slug is a reserved route and redirect early
   useEffect(() => {
@@ -154,17 +160,25 @@ export default function ProductPage({ params }: ProductPageProps) {
         
         // Initialize selected variant, color and size
         if (data.variants && data.variants.length > 0) {
-          const firstVariant = data.variants[0];
-          setSelectedVariant(firstVariant);
+          // If variant ID is in URL, try to find that variant
+          let initialVariant = data.variants[0];
+          if (variantIdFromUrl) {
+            // Try to find variant by ID or index
+            const variantById = data.variants.find(v => v.id === variantIdFromUrl || v.id.endsWith(variantIdFromUrl));
+            const variantByIndex = data.variants[parseInt(variantIdFromUrl) - 1]; // Index is 1-based in URL
+            initialVariant = variantById || variantByIndex || data.variants[0];
+          }
           
-          // Find color from first variant
-          const colorOption = firstVariant.options?.find(opt => opt.key === 'color');
+          setSelectedVariant(initialVariant);
+          
+          // Find color from selected variant
+          const colorOption = initialVariant.options?.find(opt => opt.key === 'color');
           if (colorOption) {
             setSelectedColor(colorOption.value);
           }
           
-          // Find size from first variant
-          const sizeOption = firstVariant.options?.find(opt => opt.key === 'size');
+          // Find size from selected variant
+          const sizeOption = initialVariant.options?.find(opt => opt.key === 'size');
           if (sizeOption) {
             setSelectedSize(sizeOption.value);
           }
@@ -193,7 +207,7 @@ export default function ProductPage({ params }: ProductPageProps) {
       window.removeEventListener('currency-updated', handleCurrencyUpdate);
       window.removeEventListener('language-updated', handleLanguageUpdate);
     };
-  }, [slug]);
+  }, [slug, variantIdFromUrl, router]);
 
   // Check wishlist status
   useEffect(() => {
