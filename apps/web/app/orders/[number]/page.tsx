@@ -8,6 +8,37 @@ import { apiClient } from '../../../lib/api-client';
 import { formatPrice, getStoredCurrency } from '../../../lib/currency';
 import { useAuth } from '../../../lib/auth/AuthContext';
 
+// Helper function to get color hex/rgb from color name
+const getColorValue = (colorName: string): string => {
+  const colorMap: Record<string, string> = {
+    'beige': '#F5F5DC',
+    'black': '#000000',
+    'blue': '#0000FF',
+    'brown': '#A52A2A',
+    'gray': '#808080',
+    'grey': '#808080',
+    'green': '#008000',
+    'red': '#FF0000',
+    'white': '#FFFFFF',
+    'yellow': '#FFFF00',
+    'orange': '#FFA500',
+    'pink': '#FFC0CB',
+    'purple': '#800080',
+    'navy': '#000080',
+    'maroon': '#800000',
+    'olive': '#808000',
+    'teal': '#008080',
+    'cyan': '#00FFFF',
+    'magenta': '#FF00FF',
+    'lime': '#00FF00',
+    'silver': '#C0C0C0',
+    'gold': '#FFD700',
+  };
+  
+  const normalizedName = colorName.toLowerCase().trim();
+  return colorMap[normalizedName] || '#CCCCCC'; // Default gray if color not found
+};
+
 interface OrderItem {
   variantId: string;
   productTitle: string;
@@ -17,6 +48,10 @@ interface OrderItem {
   price: number;
   total: number;
   imageUrl?: string;
+  variantOptions?: Array<{
+    attributeKey?: string;
+    value?: string;
+  }>;
 }
 
 interface Order {
@@ -169,20 +204,65 @@ export default function OrderPage() {
           <Card className="p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-6">Order Items</h2>
             <div className="space-y-4">
-              {order.items.map((item, index) => (
-                <div key={index} className="flex gap-4 pb-4 border-b border-gray-200 last:border-0">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">{item.productTitle}</h3>
-                    {item.variantTitle && (
-                      <p className="text-sm text-gray-600 mb-1">{item.variantTitle}</p>
+              {order.items.map((item, index) => {
+                // Extract color and size from variant options
+                const colorOption = item.variantOptions?.find(opt => opt.attributeKey === 'color');
+                const sizeOption = item.variantOptions?.find(opt => opt.attributeKey === 'size');
+                const color = colorOption?.value;
+                const size = sizeOption?.value;
+                
+                return (
+                  <div key={index} className="flex gap-4 pb-4 border-b border-gray-200 last:border-0">
+                    {item.imageUrl && (
+                      <div className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
+                        <img 
+                          src={item.imageUrl} 
+                          alt={item.productTitle}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
                     )}
-                    <p className="text-sm text-gray-600">SKU: {item.sku}</p>
-                    <p className="text-sm text-gray-600 mt-2">
-                      Quantity: {item.quantity} × {formatPrice(item.price, currency)} = {formatPrice(item.total, currency)}
-                    </p>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-1">{item.productTitle}</h3>
+                      {item.variantTitle && (
+                        <p className="text-sm text-gray-600 mb-1">{item.variantTitle}</p>
+                      )}
+                      
+                      {/* Display variation options (color and size) */}
+                      {(color || size) && (
+                        <div className="flex flex-wrap gap-3 mt-2 mb-2">
+                          {color && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-gray-700">Color:</span>
+                              <div className="flex items-center gap-2">
+                                <div 
+                                  className="w-5 h-5 rounded-full border border-gray-300"
+                                  style={{ 
+                                    backgroundColor: getColorValue(color),
+                                  }}
+                                  title={color}
+                                />
+                                <span className="text-sm text-gray-900 capitalize">{color}</span>
+                              </div>
+                            </div>
+                          )}
+                          {size && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-gray-700">Size:</span>
+                              <span className="text-sm text-gray-900 uppercase">{size}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      <p className="text-sm text-gray-600">SKU: {item.sku}</p>
+                      <p className="text-sm text-gray-600 mt-2">
+                        Quantity: {item.quantity} × {formatPrice(item.price, currency)} = {formatPrice(item.total, currency)}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </Card>
 

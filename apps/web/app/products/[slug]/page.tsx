@@ -98,6 +98,7 @@ export default function ProductPage({ params }: ProductPageProps) {
   const [isInWishlist, setIsInWishlist] = useState(false);
   const [isInCompare, setIsInCompare] = useState(false);
   const [quantity, setQuantity] = useState(1);
+  const [reviews, setReviews] = useState<Array<{ rating: number }>>([]);
   const thumbnailsPerView = 3;
   // Helper function to get color hex/rgb from color name
   const getColorValue = (colorName: string): string => {
@@ -266,6 +267,38 @@ export default function ProductPage({ params }: ProductPageProps) {
     };
   }, [product?.id]);
 
+  // Load reviews for rating display
+  useEffect(() => {
+    if (!product) return;
+    
+    const loadReviews = () => {
+      if (typeof window === 'undefined') return;
+      try {
+        const stored = localStorage.getItem(`reviews_${product.id}`);
+        if (stored) {
+          setReviews(JSON.parse(stored));
+        }
+      } catch (error) {
+        console.error('Error loading reviews:', error);
+      }
+    };
+
+    loadReviews();
+    
+    // Listen for review updates
+    const handleReviewUpdate = () => loadReviews();
+    window.addEventListener('review-updated', handleReviewUpdate);
+    
+    return () => {
+      window.removeEventListener('review-updated', handleReviewUpdate);
+    };
+  }, [product?.id]);
+
+  // Calculate average rating
+  const averageRating = reviews.length > 0
+    ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
+    : 0;
+
   // Debug: log images to console - moved before early returns to maintain hooks order
   useEffect(() => {
     if (product) {
@@ -421,6 +454,14 @@ export default function ProductPage({ params }: ProductPageProps) {
   const maxQuantity = currentVariant?.stock && currentVariant.stock > 0 ? currentVariant.stock : 1;
   const isOutOfStock = !currentVariant || currentVariant.stock === 0;
 
+  // Check if required variations are selected
+  const hasColorVariations = colorGroups.length > 0;
+  const hasSizeVariations = sizeGroups.length > 0;
+  const isColorRequired = hasColorVariations && !selectedColor;
+  const isSizeRequired = hasSizeVariations && !selectedSize;
+  const isVariationRequired = isColorRequired || isSizeRequired;
+  const canAddToCart = !isOutOfStock && !isVariationRequired;
+
   useEffect(() => {
     if (!currentVariant || currentVariant.stock <= 0) {
       setQuantity(1);
@@ -441,8 +482,8 @@ export default function ProductPage({ params }: ProductPageProps) {
    * Adjusts product quantity while respecting stock limits.
    */
   const adjustQuantity = (delta: number) => {
-    if (isOutOfStock) {
-      console.warn('[ProductPage] Quantity cannot be changed because product is not available');
+    if (isOutOfStock || isVariationRequired) {
+      console.warn('[ProductPage] Quantity cannot be changed because product is not available or variations are not selected');
       return;
     }
 
@@ -814,6 +855,32 @@ const handleCompareToggle = (e: MouseEvent) => {
           {product?.subtitle && (
             <p className="text-lg text-gray-600 mb-4">{product.subtitle}</p>
           )}
+          
+          {/* Star Rating */}
+          {reviews.length > 0 && (
+            <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <svg
+                    key={star}
+                    className={`w-5 h-5 ${
+                      star <= Math.round(averageRating)
+                        ? 'text-yellow-400'
+                        : 'text-gray-300'
+                    }`}
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                ))}
+              </div>
+              <span className="text-sm text-gray-600">
+                ({reviews.length} {reviews.length === 1 ? 'customer review' : 'customer reviews'})
+              </span>
+            </div>
+          )}
+          
           <div className="flex items-center gap-3 mb-6">
             <div className="flex items-center gap-2">
               <p className="text-2xl font-bold text-gray-900">
@@ -842,19 +909,133 @@ const handleCompareToggle = (e: MouseEvent) => {
             />
           )}
 
-          <div className="mt-8 p-6 bg-white border border-gray-200 rounded-2xl shadow-sm space-y-6">
+          <div className="mt-8 p-6 bg-white border border-gray-200 rounded-2xl shadow-sm space-y-5">
+            {/* Color Selector - More Compact */}
+            {colorGroups.length > 0 && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Color:</label>
+                <div className="flex flex-wrap gap-2">
+                  {colorGroups.map((group) => {
+                    const isSelected = selectedColor === group.color;
+                    const colorName = group.color;
+                    const colorValue = getColorValue(colorName);
+                    
+                    // Check if this color has available variants
+                    // If size is selected, check if there's a variant with this color and selected size
+                    // Otherwise, check if color has any available variants
+                    const availableVariants = selectedSize
+                      ? group.variants.filter(v => {
+                          const hasSize = v.options?.some(opt => opt.key === 'size' && opt.value === selectedSize);
+                          return hasSize && v.stock > 0;
+                        })
+                      : group.variants.filter(v => v.stock > 0);
+                    
+                    // Only disable if this color has no available variants at all (not just with selected size)
+                    // This allows users to change color even if it means the selected size won't be compatible
+                    const hasAnyAvailableVariants = group.variants.some(v => v.stock > 0);
+                    const isDisabled = !hasAnyAvailableVariants;
+                    
+                    return (
+                      <button
+                        key={group.color}
+                        type="button"
+                        onClick={() => {
+                          if (!isDisabled) {
+                            handleColorSelect(group.color);
+                          }
+                        }}
+                        disabled={isDisabled}
+                        className={`
+                          relative w-10 h-10 rounded-full border-2 transition-all flex items-center justify-center
+                          ${isSelected 
+                            ? 'border-gray-900 ring-2 ring-gray-900 ring-offset-2' 
+                            : isDisabled
+                            ? 'border-gray-200 opacity-50 cursor-not-allowed'
+                            : 'border-gray-300 hover:border-gray-400'
+                          }
+                        `}
+                        style={{ backgroundColor: colorValue }}
+                        aria-label={`Select color ${colorName}`}
+                        title={colorName}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Size Selector - More Compact */}
+            {sizeGroups.length > 0 && (
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-900 uppercase tracking-wide">SIZE</label>
+                <div className="flex flex-wrap gap-2">
+                  {sizeGroups.map((group) => {
+                    const isSelected = selectedSize === group.size;
+                    const sizeName = group.size;
+                    const displayStock = group.stock;
+                    
+                    // Check if this size has available variants
+                    // If color is selected, check if there's a variant with this size and selected color
+                    // Otherwise, check if size has any available variants
+                    const availableVariants = selectedColor
+                      ? group.variants.filter(v => {
+                          const hasColor = v.options?.some(opt => opt.key === 'color' && opt.value === selectedColor);
+                          return hasColor && v.stock > 0;
+                        })
+                      : group.variants.filter(v => v.stock > 0);
+                    
+                    // Only disable if this size has no available variants at all (not just with selected color)
+                    // This allows users to change size even if it means the selected color won't be compatible
+                    const hasAnyAvailableVariants = group.variants.some(v => v.stock > 0);
+                    const isDisabled = !hasAnyAvailableVariants;
+                    
+                    return (
+                      <button
+                        key={group.size}
+                        type="button"
+                        onClick={() => {
+                          if (!isDisabled) {
+                            handleSizeSelect(group.size);
+                          }
+                        }}
+                        disabled={isDisabled}
+                        className={`
+                          min-w-[50px] px-3 py-2 rounded-lg border-2 transition-all text-center
+                          ${isSelected 
+                            ? 'border-gray-900 bg-gray-50 shadow-md font-semibold' 
+                            : isDisabled
+                            ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
+                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                          }
+                        `}
+                        aria-label={`Select size ${sizeName}`}
+                      >
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span className="text-sm font-medium text-gray-900">{sizeName}</span>
+                          <span className="text-xs text-gray-500">{displayStock} pcs</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Stock Status */}
             {product && product.variants && product.variants.length > 0 && (
-              <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
                 {(() => {
-                  // Calculate total stock based on selected filters
                   let totalStock = 0;
+                  let shouldShowStock = true;
                   
-                  if (selectedColor && selectedSize) {
-                    // If both color and size are selected, show stock of specific variant
+                  // If variations are required but not selected, don't show stock yet
+                  if (isVariationRequired) {
+                    shouldShowStock = false;
+                  } else if (selectedColor && selectedSize) {
+                    // Both color and size selected - show specific variant stock
                     totalStock = currentVariant?.stock || 0;
                   } else if (selectedColor) {
-                    // If only color is selected, sum all variants of this color
+                    // Only color selected - show total stock for this color
                     totalStock = product.variants
                       .filter(v => {
                         const hasColor = v.options?.some(opt => opt.key === 'color' && opt.value === selectedColor);
@@ -862,45 +1043,48 @@ const handleCompareToggle = (e: MouseEvent) => {
                       })
                       .reduce((sum, v) => sum + v.stock, 0);
                   } else if (selectedSize) {
-                    // If only size is selected, sum all variants of this size
+                    // Only size selected - show total stock for this size
                     totalStock = product.variants
                       .filter(v => {
                         const hasSize = v.options?.some(opt => opt.key === 'size' && opt.value === selectedSize);
                         return hasSize && v.stock > 0;
                       })
                       .reduce((sum, v) => sum + v.stock, 0);
-                  } else {
-                    // If nothing is selected, show total stock of all variants
+                  } else if (!hasColorVariations && !hasSizeVariations) {
+                    // No variations at all - show total stock
                     totalStock = product.variants
                       .filter(v => v.stock > 0)
                       .reduce((sum, v) => sum + v.stock, 0);
+                  } else {
+                    // Variations exist but none selected - don't show stock
+                    shouldShowStock = false;
+                  }
+                  
+                  if (!shouldShowStock) {
+                    return null;
                   }
                   
                   const isAvailable = totalStock > 0;
                   
                   return (
-                    <>
-                      <p className={`text-sm font-semibold ${isAvailable ? 'text-green-600' : 'text-red-600'}`}>
-                        {isAvailable 
-                          ? `✓ In stock: ${totalStock} pcs` 
-                          : '✗ Out of stock'
-                        }
-                      </p>
-                      {!isAvailable && (
-                        <span className="text-xs font-medium text-red-500 uppercase tracking-wide">Not available</span>
-                      )}
-                    </>
+                    <p className={`text-sm font-semibold ${isAvailable ? 'text-green-600' : 'text-red-600'}`}>
+                      {isAvailable 
+                        ? `✓ In stock: ${totalStock} pcs` 
+                        : '✗ Out of stock'
+                      }
+                    </p>
                   );
                 })()}
               </div>
             )}
 
-            <div className="flex flex-wrap items-center gap-3">
+            {/* Quantity and Add to Cart - Moved after color/size selection */}
+            <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100">
               <div className="flex items-center border border-gray-300 rounded-xl overflow-hidden bg-gray-50">
                 <button
                   type="button"
                   onClick={() => adjustQuantity(-1)}
-                  disabled={quantity <= 1 || isOutOfStock}
+                  disabled={quantity <= 1 || isOutOfStock || isVariationRequired}
                   className="w-12 h-12 flex items-center justify-center text-gray-600 hover:text-gray-900 disabled:text-gray-300 transition-colors"
                   aria-label="Decrease quantity"
                 >
@@ -912,7 +1096,7 @@ const handleCompareToggle = (e: MouseEvent) => {
                 <button
                   type="button"
                   onClick={() => adjustQuantity(1)}
-                  disabled={isOutOfStock || quantity >= maxQuantity}
+                  disabled={isOutOfStock || quantity >= maxQuantity || isVariationRequired}
                   className="w-12 h-12 flex items-center justify-center text-gray-600 hover:text-gray-900 disabled:text-gray-300 transition-colors"
                   aria-label="Increase quantity"
                 >
@@ -923,10 +1107,20 @@ const handleCompareToggle = (e: MouseEvent) => {
               <button
                 type="button"
                 className="flex-1 min-w-[220px] h-12 px-8 bg-gray-900 text-white font-semibold tracking-wide rounded-xl uppercase hover:bg-black transition-colors disabled:bg-gray-300 disabled:text-gray-500"
-                disabled={isOutOfStock || isAddingToCart}
+                disabled={!canAddToCart || isAddingToCart}
                 onClick={async (e) => {
                   e.preventDefault();
                   e.stopPropagation();
+
+                  // Check if required variations are selected
+                  if (isVariationRequired) {
+                    const missingOptions: string[] = [];
+                    if (isColorRequired) missingOptions.push('color');
+                    if (isSizeRequired) missingOptions.push('size');
+                    setShowMessage(`Please select ${missingOptions.join(' and ')}`);
+                    setTimeout(() => setShowMessage(null), 3000);
+                    return;
+                  }
 
                   if (isOutOfStock || !currentVariant) {
                     return;
@@ -1069,7 +1263,17 @@ const handleCompareToggle = (e: MouseEvent) => {
                   }
                 }}
               >
-                {isAddingToCart ? 'Adding…' : isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
+                {isAddingToCart 
+                  ? 'Adding…' 
+                  : isOutOfStock 
+                    ? 'Out of Stock' 
+                    : isVariationRequired
+                      ? (isColorRequired && isSizeRequired 
+                          ? 'Select Color & Size' 
+                          : isColorRequired 
+                            ? 'Select Color' 
+                            : 'Select Size')
+                      : 'Add to Cart'}
               </button>
 
               <div className="flex gap-2">
@@ -1100,125 +1304,6 @@ const handleCompareToggle = (e: MouseEvent) => {
                 </button>
               </div>
             </div>
-
-            {/* Color Selector */}
-            {colorGroups.length > 0 && (
-              <div className="space-y-3 border-t border-gray-100 pt-4">
-                <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                  COLOR
-                </h3>
-                <div className="flex flex-wrap gap-3">
-                  {colorGroups.map((group) => {
-                    const isSelected = selectedColor === group.color;
-                    const colorName = group.color;
-                    const colorValue = getColorValue(colorName);
-                    
-                    // Always show total stock for this color (without size filter)
-                    // This allows user to see all available colors when changing selection
-                    const displayStock = group.stock;
-                    
-                    // Check if this color has available variants with selected size
-                    const availableVariants = selectedSize
-                      ? group.variants.filter(v => {
-                          const hasSize = v.options?.some(opt => opt.key === 'size' && opt.value === selectedSize);
-                          return hasSize && v.stock > 0;
-                        })
-                      : group.variants.filter(v => v.stock > 0);
-                    
-                    const isDisabled = availableVariants.length === 0 && selectedSize !== null;
-                    
-                    return (
-                      <button
-                        key={group.color}
-                        type="button"
-                        onClick={() => {
-                          if (!isDisabled) {
-                            handleColorSelect(group.color);
-                          }
-                        }}
-                        disabled={isDisabled}
-                        className={`
-                          relative flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all
-                          ${isSelected 
-                            ? 'border-gray-900 bg-gray-50 shadow-md' 
-                            : isDisabled
-                            ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
-                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                          }
-                        `}
-                        aria-label={`Select color ${colorName}`}
-                      >
-                        <div 
-                          className="w-6 h-6 rounded-full border-2 border-gray-300 flex-shrink-0"
-                          style={{ backgroundColor: colorValue }}
-                        />
-                        <span className="text-sm font-medium text-gray-900 capitalize">{colorName}</span>
-                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                          {displayStock}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Size Selector */}
-            {sizeGroups.length > 0 && (
-              <div className="space-y-3 border-t border-gray-100 pt-4">
-                <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                  SIZE
-                </h3>
-                <div className="flex flex-wrap gap-3">
-                  {sizeGroups.map((group) => {
-                    const isSelected = selectedSize === group.size;
-                    const sizeName = group.size;
-                    
-                    // Always show total stock for this size (without color filter)
-                    // This allows user to see all available sizes when changing selection
-                    const displayStock = group.stock;
-                    
-                    // Check if this size has available variants with selected color
-                    const availableVariants = selectedColor
-                      ? group.variants.filter(v => {
-                          const hasColor = v.options?.some(opt => opt.key === 'color' && opt.value === selectedColor);
-                          return hasColor && v.stock > 0;
-                        })
-                      : group.variants.filter(v => v.stock > 0);
-                    
-                    const isDisabled = availableVariants.length === 0 && selectedColor !== null;
-                    
-                    return (
-                      <button
-                        key={group.size}
-                        type="button"
-                        onClick={() => {
-                          if (!isDisabled) {
-                            handleSizeSelect(group.size);
-                          }
-                        }}
-                        disabled={isDisabled}
-                        className={`
-                          min-w-[60px] px-4 py-2.5 rounded-lg border-2 transition-all text-center
-                          ${isSelected 
-                            ? 'border-gray-900 bg-gray-50 shadow-md font-semibold' 
-                            : isDisabled
-                            ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
-                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                          }
-                        `}
-                        aria-label={`Select size ${sizeName}`}
-                      >
-                        <div className="flex flex-col items-center gap-1">
-                          <span className="text-sm font-medium text-gray-900">{sizeName}</span>
-                          <span className="text-xs text-gray-500">{displayStock} pcs</span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Success/Error Message */}

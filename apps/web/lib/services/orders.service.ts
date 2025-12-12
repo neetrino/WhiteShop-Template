@@ -430,7 +430,15 @@ class OrdersService {
         userId,
       },
       include: {
-        items: true,
+        items: {
+          include: {
+            variant: {
+              include: {
+                options: true,
+              },
+            },
+          },
+        },
         payments: true,
         events: true,
       },
@@ -470,6 +478,12 @@ class OrdersService {
         price: number;
         total: number;
         imageUrl: string | null;
+        variant: {
+          options: Array<{
+            attributeKey: string | null;
+            value: string | null;
+          }>;
+        } | null;
       }) => ({
         variantId: item.variantId || '',
         productTitle: item.productTitle,
@@ -479,6 +493,13 @@ class OrdersService {
         price: Number(item.price),
         total: Number(item.total),
         imageUrl: item.imageUrl || undefined,
+        variantOptions: item.variant?.options?.map((opt: {
+          attributeKey: string | null;
+          value: string | null;
+        }) => ({
+          attributeKey: opt.attributeKey || undefined,
+          value: opt.value || undefined,
+        })) || [],
       })),
       totals: {
         subtotal: Number(order.subtotal),

@@ -97,6 +97,11 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
       setRating(0);
       setComment('');
       setShowForm(false);
+      
+      // Dispatch event to update rating on product page
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('review-updated'));
+      }
     } catch (error) {
       console.error('Error submitting review:', error);
       alert(getTranslation('reviews.submitError', language) || 'Failed to submit review');
