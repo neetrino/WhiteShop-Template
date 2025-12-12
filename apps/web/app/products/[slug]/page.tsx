@@ -881,7 +881,7 @@ const handleCompareToggle = (e: MouseEvent) => {
             </div>
           )}
           
-          <div className="flex items-center gap-3 mb-6">
+          <div className="flex flex-col gap-1 mb-6">
             <div className="flex items-center gap-2">
               <p className="text-2xl font-bold text-gray-900">
                 {formatPrice(price, currency)}
@@ -893,7 +893,7 @@ const handleCompareToggle = (e: MouseEvent) => {
               )}
             </div>
             {(originalPrice && originalPrice > price) || (compareAtPrice && compareAtPrice > price) ? (
-              <p className="text-xl text-gray-500 line-through">
+              <p className="text-lg text-gray-500 line-through">
                 {formatPrice(
                   (originalPrice && originalPrice > price) ? originalPrice : (compareAtPrice || 0),
                   currency

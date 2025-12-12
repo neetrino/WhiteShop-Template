@@ -601,7 +601,7 @@ export default function CartPage() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 md:hidden">
                   Subtotal
                 </p>
-                <div className="flex items-center gap-3 mt-1 md:mt-0">
+                <div className="flex flex-col gap-1 mt-1 md:mt-0">
                   <span className="text-lg font-semibold text-blue-600">
                     {formatPrice(item.total, currency)}
                   </span>
