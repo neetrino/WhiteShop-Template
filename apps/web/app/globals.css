@@ -68,3 +68,73 @@
   }
 }
 
+/* Policy pages typography & spacing */
+.policy-page {
+  max-width: 56rem; /* ~max-w-4xl */
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;  /* px-4 */
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .policy-page {
+    padding-left: 1.5rem; /* sm:px-6 */
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .policy-page {
+    padding-left: 2rem; /* lg:px-8 */
+    padding-right: 2rem;
+  }
+}
+
+.policy-page-inner {
+  padding-top: 3rem;   /* pt-12 */
+  padding-bottom: 4rem; /* pb-16 */
+}
+
+@media (min-width: 768px) {
+  .policy-page-inner {
+    padding-top: 4rem; /* md:pt-16 */
+  }
+}
+
+/* Headings: more air above & below, not stuck to header */
+.policy-page-inner h1,
+.policy-page-inner h2,
+.policy-page-inner h3 {
+  margin-top: 2.5rem;   /* space from previous block */
+  margin-bottom: 1rem;  /* space before paragraph */
+}
+
+.policy-page-inner h1:first-of-type {
+  margin-top: 0; /* already have top padding on container */
+}
+
+.policy-page-inner h2:first-of-type,
+.policy-page-inner h3:first-of-type {
+  margin-top: 1.75rem;
+}
+
+/* Paragraphs: clear space from heading */
+.policy-page-inner p {
+  margin-top: 0.75rem;
+  margin-bottom: 0;
+  line-height: 1.7;
+}
+
+/* Lists: align nicely under text, with comfortable spacing */
+.policy-page-inner ul,
+.policy-page-inner ol {
+  margin-top: 0.75rem;
+  margin-bottom: 0;
+  padding-left: 1.25rem;
+}
+
+.policy-page-inner li + li {
+  margin-top: 0.25rem;
+}
+

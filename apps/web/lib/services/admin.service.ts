@@ -209,7 +209,7 @@ class AdminService {
 
     console.log('📦 [ADMIN SERVICE] getOrders with filters:', { where, page, limit, skip, orderBy });
 
-    // Get orders with pagination
+    // Get orders with pagination, including related user for basic customer info
     const [orders, total] = await Promise.all([
       db.order.findMany({
         where,
@@ -218,25 +218,62 @@ class AdminService {
         orderBy,
         include: {
           items: true,
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+            },
+          },
         },
       }),
       db.order.count({ where }),
     ]);
 
     // Format orders for response
-    const formattedOrders = orders.map((order: { id: string; number: string; status: string; paymentStatus: string; fulfillmentStatus: string; total: number; currency: string | null; customerEmail: string | null; customerPhone: string | null; createdAt: Date; items: Array<unknown> }) => ({
-      id: order.id,
-      number: order.number,
-      status: order.status,
-      paymentStatus: order.paymentStatus,
-      fulfillmentStatus: order.fulfillmentStatus,
-      total: order.total,
-      currency: order.currency || 'AMD',
-      customerEmail: order.customerEmail || '',
-      customerPhone: order.customerPhone || '',
-      itemsCount: order.items.length,
-      createdAt: order.createdAt.toISOString(),
-    }));
+    const formattedOrders = orders.map((order: { 
+      id: string; 
+      number: string; 
+      status: string; 
+      paymentStatus: string; 
+      fulfillmentStatus: string; 
+      total: number; 
+      currency: string | null; 
+      customerEmail: string | null; 
+      customerPhone: string | null; 
+      createdAt: Date;
+      items: Array<unknown>;
+      user?: {
+        id: string;
+        firstName: string | null;
+        lastName: string | null;
+        email: string | null;
+        phone: string | null;
+      } | null;
+    }) => {
+      const customer = order.user || null;
+      const firstName = customer?.firstName || '';
+      const lastName = customer?.lastName || '';
+
+      return {
+        id: order.id,
+        number: order.number,
+        status: order.status,
+        paymentStatus: order.paymentStatus,
+        fulfillmentStatus: order.fulfillmentStatus,
+        total: order.total,
+        currency: order.currency || 'AMD',
+        customerEmail: customer?.email || order.customerEmail || '',
+        customerPhone: customer?.phone || order.customerPhone || '',
+        customerFirstName: firstName,
+        customerLastName: lastName,
+        customerId: customer?.id || null,
+        itemsCount: order.items.length,
+        createdAt: order.createdAt.toISOString(),
+      };
+    });
 
     return {
       data: formattedOrders,
@@ -246,6 +283,127 @@ class AdminService {
         limit,
         totalPages: Math.ceil(total / limit),
       },
+    };
+  }
+
+  /**
+   * Get single order by ID with full details for admin
+   */
+  async getOrderById(orderId: string) {
+    // Fetch order with related user and items/variants/products
+    const order = await db.order.findUnique({
+      where: { id: orderId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            phone: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        items: {
+          include: {
+            variant: {
+              include: {
+                product: {
+                  include: {
+                    translations: {
+                      where: { locale: "en" },
+                      take: 1,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        payments: true,
+      },
+    });
+
+    if (!order) {
+      throw {
+        status: 404,
+        type: "https://api.shop.am/problems/not-found",
+        title: "Order not found",
+        detail: `Order with id '${orderId}' does not exist`,
+      };
+    }
+
+    const user = order.user as any;
+    const items = Array.isArray(order.items) ? order.items : [];
+
+    const formattedItems = items.map((item: any) => {
+      const variant = item.variant;
+      const product = variant?.product;
+      const translations = Array.isArray(product?.translations)
+        ? product.translations
+        : [];
+      const translation = translations[0] || null;
+
+      const quantity = item.quantity ?? 0;
+      const total = item.total ?? 0;
+      const unitPrice =
+        quantity > 0 ? Number((total / quantity).toFixed(2)) : total;
+
+      return {
+        id: item.id,
+        variantId: item.variantId || variant?.id || null,
+        productId: product?.id || null,
+        productTitle: translation?.title || item.productTitle || "Unknown Product",
+        sku: variant?.sku || item.sku || "N/A",
+        quantity,
+        total,
+        unitPrice,
+      };
+    });
+
+    const payments = Array.isArray(order.payments) ? order.payments : [];
+    const primaryPayment = payments[0] || null;
+
+    return {
+      id: order.id,
+      number: order.number,
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      fulfillmentStatus: order.fulfillmentStatus,
+      total: order.total,
+      currency: order.currency || "AMD",
+      customerEmail: order.customerEmail || user?.email || undefined,
+      customerPhone: order.customerPhone || user?.phone || undefined,
+      billingAddress: order.billingAddress as any || null,
+      shippingAddress: order.shippingAddress as any || null,
+      shippingMethod: order.shippingMethod || null,
+      notes: order.notes || null,
+      adminNotes: order.adminNotes || null,
+      ipAddress: order.ipAddress || null,
+      userAgent: order.userAgent || null,
+      payment: primaryPayment
+        ? {
+            id: primaryPayment.id,
+            provider: primaryPayment.provider,
+            method: primaryPayment.method,
+            amount: primaryPayment.amount,
+            currency: primaryPayment.currency,
+            status: primaryPayment.status,
+            cardLast4: primaryPayment.cardLast4,
+            cardBrand: primaryPayment.cardBrand,
+          }
+        : null,
+      customer: user
+        ? {
+            id: user.id,
+            email: user.email,
+            phone: user.phone,
+            firstName: user.firstName,
+            lastName: user.lastName,
+          }
+        : null,
+      createdAt: order.createdAt.toISOString(),
+      updatedAt: order.updatedAt?.toISOString?.() ?? undefined,
+      items: formattedItems,
     };
   }
 

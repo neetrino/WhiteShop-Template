@@ -16,6 +16,9 @@ interface Order {
   currency: string;
   customerEmail: string;
   customerPhone: string;
+  customerFirstName?: string;
+  customerLastName?: string;
+  customerId?: string | null;
   itemsCount: number;
   createdAt: string;
 }
@@ -517,11 +520,22 @@ export default function OrdersPage() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900">{order.number}</div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{order.customerEmail}</div>
+                        <td
+                          className="px-6 py-4 whitespace-nowrap cursor-pointer hover:bg-gray-50"
+                          onClick={() => {
+                            console.log('📂 [ADMIN][Orders] Navigate to order details page', {
+                              orderId: order.id,
+                            });
+                            router.push(`/admin/orders/${order.id}`);
+                          }}
+                        >
+                          <div className="text-sm font-medium text-gray-900">
+                            {[order.customerFirstName, order.customerLastName].filter(Boolean).join(' ') || 'Unknown customer'}
+                          </div>
                           {order.customerPhone && (
                             <div className="text-sm text-gray-500">{order.customerPhone}</div>
                           )}
+                          <div className="mt-1 text-xs text-blue-600">View order details</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-2">

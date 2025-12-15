@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/AuthContext';
 import { Card, Button, Input } from '@shop/ui';
 import { apiClient } from '../../../../lib/api-client';
+import { getColorHex } from '../../../../lib/colorMap';
 
 // Component for adding new color/size
 function NewColorSizeInput({ 
@@ -161,6 +162,8 @@ function AddProductPageContent() {
     labels: [] as ProductLabel[],
   });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const variantImageFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [variantImageTargetId, setVariantImageTargetId] = useState<string | null>(null);
   const [imageUploadLoading, setImageUploadLoading] = useState(false);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   const [newBrandName, setNewBrandName] = useState('');
@@ -621,6 +624,88 @@ function AddProductPageContent() {
     }));
   };
 
+  /**
+   * Get primary price from the first variant.
+   * This is used for the main Price field in the basic information block.
+   */
+  const getPrimaryPrice = () => {
+    if (!formData.variants || formData.variants.length === 0) return '';
+    return formData.variants[0].price || '';
+  };
+
+  /**
+   * Update price for all variants from the main Price field.
+   * If there are no variants yet, create a default one so price is not lost.
+   */
+  const handlePrimaryPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value;
+
+    // Allow only digits and one dot, same behavior as variant price input
+    value = value.replace(/[^\d.]/g, '');
+    const parts = value.split('.');
+    if (parts.length > 2) {
+      value = parts[0] + '.' + parts.slice(1).join('');
+    }
+    if (parts.length === 2 && parts[1].length > 2) {
+      value = parts[0] + '.' + parts[1].substring(0, 2);
+    }
+
+    setFormData((prev) => {
+      // If no variants yet, create one so price is stored correctly
+      if (!prev.variants || prev.variants.length === 0) {
+        const newVariant: Variant = {
+          id: `variant-${Date.now()}`,
+          price: value,
+          compareAtPrice: '',
+          stock: '',
+          sku: '',
+          color: '',
+          colors: [],
+          colorStocks: {},
+          colorLabels: {},
+          size: '',
+          sizes: [],
+          sizeStocks: {},
+          sizeLabels: {},
+          imageUrl: '',
+        };
+        return {
+          ...prev,
+          variants: [newVariant],
+        };
+      }
+
+      return {
+        ...prev,
+        variants: prev.variants.map((v) => ({
+          ...v,
+          price: value,
+        })),
+      };
+    });
+  };
+
+  /**
+   * Format price on blur and sync to all variants.
+   */
+  const handlePrimaryPriceBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value.trim();
+    if (!rawValue || isNaN(parseFloat(rawValue))) return;
+
+    const numValue = parseFloat(rawValue);
+    if (numValue <= 0) return;
+
+    const formatted = numValue.toFixed(2);
+
+    setFormData((prev) => ({
+      ...prev,
+      variants: (prev.variants || []).map((v) => ({
+        ...v,
+        price: formatted,
+      })),
+    }));
+  };
+
   const addImageUrl = () => {
     setFormData((prev) => ({
       ...prev,
@@ -698,6 +783,38 @@ function AddProductPageContent() {
       if (event.target) {
         event.target.value = '';
       }
+    }
+  };
+
+  const handleUploadVariantImage = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length || !variantImageTargetId) {
+      if (event.target) {
+        event.target.value = '';
+      }
+      return;
+    }
+
+    const [file] = files;
+    if (!file.type.startsWith('image/')) {
+      alert(`"${file.name}" is not an image file`);
+      if (event.target) {
+        event.target.value = '';
+      }
+      return;
+    }
+
+    try {
+      const base64 = await fileToBase64(file);
+      updateVariant(variantImageTargetId, 'imageUrl', base64);
+    } catch (error: any) {
+      console.error('❌ [ADMIN] Error uploading variant image:', error);
+      alert(error?.message || 'Failed to process selected image');
+    } finally {
+      if (event.target) {
+        event.target.value = '';
+      }
+      setVariantImageTargetId(null);
     }
   };
 
@@ -1349,6 +1466,21 @@ function AddProductPageContent() {
                     placeholder="Product description (HTML supported)"
                   />
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Price *
+                  </label>
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    value={getPrimaryPrice()}
+                    onChange={handlePrimaryPriceChange}
+                    onBlur={handlePrimaryPriceBlur}
+                    required
+                    placeholder="0.00"
+                  />
+                </div>
               </div>
             </div>
 
@@ -1788,42 +1920,6 @@ function AddProductPageContent() {
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Price */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Price *
-                          </label>
-                          <Input
-                            type="text"
-                            inputMode="decimal"
-                            value={variant.price}
-                            onChange={(e) => {
-                              let value = e.target.value;
-                              value = value.replace(/[^\d.]/g, '');
-                              const parts = value.split('.');
-                              if (parts.length > 2) {
-                                value = parts[0] + '.' + parts.slice(1).join('');
-                              }
-                              if (parts.length === 2 && parts[1].length > 2) {
-                                value = parts[0] + '.' + parts[1].substring(0, 2);
-                              }
-                              updateVariant(variant.id, 'price', value);
-                            }}
-                            onBlur={(e) => {
-                              const value = e.target.value.trim();
-                              if (value && !isNaN(parseFloat(value))) {
-                                const numValue = parseFloat(value);
-                                if (numValue > 0) {
-                                  updateVariant(variant.id, 'price', numValue.toFixed(2));
-                                }
-                              }
-                            }}
-                            required
-                            placeholder="0.00"
-                            className="w-full"
-                          />
-                        </div>
-
                         {/* Compare At Price */}
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1937,6 +2033,7 @@ function AddProductPageContent() {
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 border-2 border-gray-300 rounded-lg bg-white max-h-64 overflow-y-auto shadow-sm">
                                 {getColorAttribute()?.values.map((val) => {
                                   const isSelected = (variant.colors || []).includes(val.value);
+                                  const colorHex = getColorHex(val.label);
                                   return (
                                     <label
                                       key={val.id}
@@ -1952,10 +2049,16 @@ function AddProductPageContent() {
                                         onChange={() => toggleVariantColor(variant.id, val.value)}
                                         className="w-5 h-5 text-gray-600 border-gray-300 rounded focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 cursor-pointer"
                                       />
-                                      <span className={`text-sm font-medium ${
-                                        isSelected ? 'text-gray-900' : 'text-gray-700'
-                                      }`}>
-                                        {val.label}
+                                      <span className="flex items-center gap-2">
+                                        <span
+                                          className="inline-block w-4 h-4 rounded-full border border-gray-300"
+                                          style={{ backgroundColor: colorHex }}
+                                        />
+                                        <span className={`text-sm font-medium ${
+                                          isSelected ? 'text-gray-900' : 'text-gray-700'
+                                        }`}>
+                                          {val.label}
+                                        </span>
                                       </span>
                                     </label>
                                   );
@@ -1979,6 +2082,7 @@ function AddProductPageContent() {
                                       const savedLabel = variant.colorLabels?.[colorValue];
                                       const colorLabel = savedLabel || 
                                         (colorValue.charAt(0).toUpperCase() + colorValue.slice(1).replace(/-/g, ' '));
+                                      const colorHex = getColorHex(colorLabel);
                                       
                                       return (
                                         <label
@@ -1995,10 +2099,16 @@ function AddProductPageContent() {
                                             onChange={() => toggleVariantColor(variant.id, colorValue)}
                                             className="w-5 h-5 text-gray-600 border-gray-300 rounded focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 cursor-pointer"
                                           />
-                                          <span className={`text-sm font-medium ${
-                                            isSelected ? 'text-gray-900' : 'text-gray-700'
-                                          }`}>
-                                            {colorLabel}
+                                          <span className="flex items-center gap-2">
+                                            <span
+                                              className="inline-block w-4 h-4 rounded-full border border-gray-300"
+                                              style={{ backgroundColor: colorHex }}
+                                            />
+                                            <span className={`text-sm font-medium ${
+                                              isSelected ? 'text-gray-900' : 'text-gray-700'
+                                            }`}>
+                                              {colorLabel}
+                                            </span>
                                           </span>
                                         </label>
                                       );
@@ -2314,18 +2424,31 @@ function AddProductPageContent() {
                           )}
                         </div>
 
-                        {/* Variant Image URL */}
+                        {/* Variant Image URL / Upload */}
                         <div className="md:col-span-2">
                           <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Variant Image URL (optional)
+                            Variant Image (optional)
                           </label>
-                          <Input
-                            type="url"
-                            value={variant.imageUrl}
-                            onChange={(e) => updateVariant(variant.id, 'imageUrl', e.target.value)}
-                            placeholder="https://example.com/variant-image.jpg"
-                            className="w-full"
-                          />
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <Input
+                              type="url"
+                              value={variant.imageUrl}
+                              onChange={(e) => updateVariant(variant.id, 'imageUrl', e.target.value)}
+                              placeholder="https://example.com/variant-image.jpg"
+                              className="w-full sm:flex-1"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="w-full sm:w-auto text-xs"
+                              onClick={() => {
+                                setVariantImageTargetId(variant.id);
+                                variantImageFileInputRef.current?.click();
+                              }}
+                            >
+                              Upload Image
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -2380,6 +2503,14 @@ function AddProductPageContent() {
                 Cancel
               </Button>
             </div>
+            {/* Hidden input for variant image uploads */}
+            <input
+              ref={variantImageFileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleUploadVariantImage}
+            />
           </form>
         </Card>
       </div>
