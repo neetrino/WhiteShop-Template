@@ -9,6 +9,7 @@ export interface AdminMenuItem {
   label: string;
   path: string;
   icon: ReactNode;
+  isSubCategory?: boolean;
 }
 
 interface AdminMenuDrawerProps {
@@ -104,6 +105,8 @@ export function AdminMenuDrawer({ tabs, currentPath }: AdminMenuDrawerProps) {
                     key={tab.id}
                     onClick={() => handleNavigate(tab.path)}
                     className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium ${
+                      tab.isSubCategory ? 'pl-12' : ''
+                    } ${
                       isActive ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
