@@ -161,7 +161,7 @@ export default async function ProductsPage({ searchParams }: any) {
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full overflow-x-hidden max-w-full">
       {/* Category Navigation - Full Width */}
       <CategoryNavigation />
       
@@ -173,8 +173,8 @@ export default async function ProductsPage({ searchParams }: any) {
         />
       </div>
 
-      <div className={`${PAGE_CONTAINER} flex gap-8`}>
-        <aside className="w-64 hidden lg:block bg-gray-50 rounded-xl">
+      <div className={`${PAGE_CONTAINER} flex flex-col lg:flex-row gap-8 max-w-full`}>
+        <aside className="w-64 hidden lg:block bg-gray-50 rounded-xl flex-shrink-0">
           <div className="sticky top-4 p-4 space-y-6">
             <Suspense fallback={<div>Loading filters...</div>}>
               <PriceFilter currentMinPrice={params?.minPrice} currentMaxPrice={params?.maxPrice} category={params?.category} search={params?.search} />
@@ -185,7 +185,7 @@ export default async function ProductsPage({ searchParams }: any) {
           </div>
         </aside>
 
-        <div className="flex-1 py-4">
+        <div className="flex-1 min-w-0 w-full lg:w-auto py-4 overflow-x-hidden">
 
           {normalizedProducts.length > 0 ? (
             <>

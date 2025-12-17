@@ -2,8 +2,6 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useRef, Suspense } from 'react';
-import { Filter } from 'lucide-react';
-import { MOBILE_FILTERS_EVENT } from '../lib/events';
 
 type ViewMode = 'list' | 'grid-2' | 'grid-3';
 type SortOption = 'default' | 'price-asc' | 'price-desc' | 'name-asc' | 'name-desc';
@@ -154,29 +152,10 @@ function ProductsHeaderContent({ total, perPage }: ProductsHeaderProps) {
           )}
         </div>
 
-        {/* Filters Button + Sort + Show + View Mode Icons - On one line */}
+        {/* Sort + Show + View Mode Icons - On one line */}
         <div className="flex items-center justify-between gap-2">
-          {/* Mobile: Filter Button + Sort Arrow + Show - On the left */}
+          {/* Mobile: Sort Arrow + Show - On the left */}
           <div className="sm:hidden flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                console.debug('[ProductsHeader] Opening mobile filters');
-                window.dispatchEvent(new Event(MOBILE_FILTERS_EVENT));
-              }}
-              className="flex items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-200"
-            >
-              <Filter className="w-4 h-4" />
-              <span>Filters</span>
-              {hasActiveFilters && (
-                <span className="ml-1 rounded-full bg-gray-900 px-1.5 py-0.5 text-xs font-semibold text-white">
-                  {Object.keys(Object.fromEntries(searchParams.entries())).filter(key => 
-                    ['search', 'category', 'minPrice', 'maxPrice', 'colors', 'sizes', 'brand'].includes(key)
-                  ).length}
-                </span>
-              )}
-            </button>
-
             {/* Mobile Sort Arrow */}
             <div className="relative" ref={mobileSortDropdownRef}>
               <button

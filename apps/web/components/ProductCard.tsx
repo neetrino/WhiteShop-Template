@@ -410,11 +410,12 @@ export function ProductCard({ product, viewMode = 'grid-3' }: ProductCardProps) 
   if (viewMode === 'list') {
     return (
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:bg-gray-50 transition-colors">
-        <div className="flex items-center gap-4 px-6 py-4">
+        {/* Mobile: Vertical layout, Desktop: Horizontal layout */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 px-4 sm:px-6 py-4">
           {/* Product Image - small like in cart */}
           <Link
             href={`/products/${product.slug}`}
-            className="w-20 h-20 bg-gray-100 rounded-lg flex-shrink-0 relative overflow-hidden"
+            className="w-20 h-20 bg-gray-100 rounded-lg flex-shrink-0 relative overflow-hidden self-start sm:self-center"
           >
             {product.image && !imageError ? (
               <Image
@@ -436,12 +437,12 @@ export function ProductCard({ product, viewMode = 'grid-3' }: ProductCardProps) 
           </Link>
 
           {/* Product Info */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 w-full sm:w-auto">
             <Link href={`/products/${product.slug}`} className="block">
-              <h3 className="text-xl font-medium text-gray-900 hover:text-blue-600 transition-colors line-clamp-2">
+              <h3 className="text-lg sm:text-xl font-medium text-gray-900 hover:text-blue-600 transition-colors line-clamp-2">
                 {product.title}
               </h3>
-              <p className="text-lg text-gray-500 mt-1">
+              <p className="text-base sm:text-lg text-gray-500 mt-1">
                 {product.brand?.name || 'Grocery'}
               </p>
             </Link>
@@ -469,22 +470,23 @@ export function ProductCard({ product, viewMode = 'grid-3' }: ProductCardProps) 
             )}
           </div>
 
-          {/* Price */}
-          <div className="flex items-center gap-4">
+          {/* Price and Actions - Mobile: Stacked, Desktop: Horizontal */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
+            {/* Price */}
             <div className="flex flex-col">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl font-semibold text-blue-600 whitespace-nowrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xl sm:text-2xl font-semibold text-blue-600">
                   {formatPrice(product.price || 0, currency || 'USD')}
                 </span>
                 {product.discountPercent && product.discountPercent > 0 ? (
-                  <span className="text-sm font-semibold text-blue-600 whitespace-nowrap">
+                  <span className="text-xs sm:text-sm font-semibold text-blue-600">
                     -{product.discountPercent}%
                   </span>
                 ) : null}
               </div>
               {(product.originalPrice && product.originalPrice > product.price) || 
                (product.compareAtPrice && product.compareAtPrice > product.price) ? (
-                <span className="text-lg text-gray-500 line-through whitespace-nowrap">
+                <span className="text-base sm:text-lg text-gray-500 line-through mt-0.5">
                   {formatPrice(
                     (product.originalPrice && product.originalPrice > product.price) 
                       ? product.originalPrice 
@@ -496,11 +498,11 @@ export function ProductCard({ product, viewMode = 'grid-3' }: ProductCardProps) 
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 self-start sm:self-center">
               {/* Compare Icon */}
               <button
                 onClick={handleCompareToggle}
-                className={`w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
+                className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
                   isInCompare
                     ? 'border-gray-900 text-gray-900 bg-white shadow-sm'
                     : 'border-gray-200 text-gray-700 bg-white hover:border-gray-300 hover:bg-gray-50'
@@ -514,7 +516,7 @@ export function ProductCard({ product, viewMode = 'grid-3' }: ProductCardProps) 
               {/* Wishlist Icon */}
               <button
                 onClick={handleWishlistToggle}
-                className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
+                className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
                   isInWishlist
                     ? 'bg-red-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -529,7 +531,7 @@ export function ProductCard({ product, viewMode = 'grid-3' }: ProductCardProps) 
               <button
                 onClick={handleAddToCart}
                 disabled={!product.inStock || isAddingToCart}
-                className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
+                className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
                   product.inStock && !isAddingToCart
                     ? 'bg-gray-100 text-gray-700 hover:bg-green-600 hover:text-white'
                     : 'bg-gray-100 text-gray-400 cursor-not-allowed'
@@ -538,12 +540,12 @@ export function ProductCard({ product, viewMode = 'grid-3' }: ProductCardProps) 
                 aria-label={product.inStock ? 'Add to cart' : 'Out of stock'}
               >
                 {isAddingToCart ? (
-                  <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin h-4 w-4 sm:h-5 sm:w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
                 ) : (
-                  <CartPngIcon size={24} />
+                  <CartPngIcon size={20} />
                 )}
               </button>
             </div>
