@@ -895,12 +895,22 @@ class ProductsService {
     });
 
     if (!product) {
+      console.warn(`[ProductsService] Product not found by slug: ${slug} (lang: ${lang})`);
       throw {
         status: 404,
         type: "https://api.shop.am/problems/not-found",
         title: "Product not found",
         detail: `Product with slug '${slug}' does not exist or is not published`,
       };
+    }
+
+    console.log(`[ProductsService] Found product: ${product.id}, variants count: ${product.variants?.length}`);
+    if (product.variants?.length > 0) {
+      console.log(`[ProductsService] Variants prices and options:`, product.variants.map(v => ({
+        id: v.id,
+        price: v.price,
+        options: v.options.map(o => ({ key: o.attributeKey, value: o.value }))
+      })));
     }
 
     // Безопасное получение translation с проверкой на существование массива

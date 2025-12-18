@@ -214,6 +214,17 @@ export default function ProductPage({ params }: ProductPageProps) {
       try {
         setLoading(true);
         const data = await apiClient.get<Product>(`/api/v1/products/${slug}`);
+        console.log(`[ProductPage][Fetch] Product data received:`, {
+          id: data.id,
+          title: data.title,
+          variantsCount: data.variants?.length,
+          variants: data.variants?.map(v => ({
+            id: v.id,
+            price: v.price,
+            stock: v.stock,
+            options: v.options
+          }))
+        });
         setProduct(data);
         setCurrentImageIndex(0);
         setThumbnailStartIndex(0);
@@ -225,6 +236,11 @@ export default function ProductPage({ params }: ProductPageProps) {
             const variantByIndex = data.variants[parseInt(variantIdFromUrl) - 1];
             initialVariant = variantById || variantByIndex || data.variants[0];
           }
+          console.log(`[ProductPage][Fetch] Initial variant set:`, {
+            id: initialVariant.id,
+            price: initialVariant.price,
+            options: initialVariant.options
+          });
           setSelectedVariant(initialVariant);
           const colorOption = initialVariant.options?.find(opt => opt.key === 'color');
           if (colorOption) setSelectedColor(colorOption.value);
@@ -306,30 +322,45 @@ export default function ProductPage({ params }: ProductPageProps) {
 
   const findVariantByColorAndSize = useCallback((color: string | null, size: string | null): ProductVariant | null => {
     if (!product?.variants || product.variants.length === 0) return null;
+    
+    let result: ProductVariant | null = null;
+    
     if (color && size) {
-      const variant = product.variants.find(v => 
+      result = product.variants.find(v => 
         v.options?.some(opt => opt.key === 'color' && opt.value === color) &&
         v.options?.some(opt => opt.key === 'size' && opt.value === size)
-      );
-      if (variant) return variant;
+      ) || null;
+    } else if (color && !size) {
+      result = product.variants.find(v => v.options?.some(opt => opt.key === 'color' && opt.value === color) && v.stock > 0) 
+                   || product.variants.find(v => v.options?.some(opt => opt.key === 'color' && opt.value === color))
+                   || null;
+    } else if (size && !color) {
+      result = product.variants.find(v => v.options?.some(opt => opt.key === 'size' && opt.value === size) && v.stock > 0)
+                   || product.variants.find(v => v.options?.some(opt => opt.key === 'size' && opt.value === size))
+                   || null;
+    } else {
+      result = product.variants.find(v => v.stock > 0) || product.variants[0] || null;
     }
-    if (color && !size) {
-      const variant = product.variants.find(v => v.options?.some(opt => opt.key === 'color' && opt.value === color) && v.stock > 0) 
-                   || product.variants.find(v => v.options?.some(opt => opt.key === 'color' && opt.value === color));
-      if (variant) return variant;
-    }
-    if (size && !color) {
-      const variant = product.variants.find(v => v.options?.some(opt => opt.key === 'size' && opt.value === size) && v.stock > 0)
-                   || product.variants.find(v => v.options?.some(opt => opt.key === 'size' && opt.value === size));
-      if (variant) return variant;
-    }
-    return product.variants.find(v => v.stock > 0) || product.variants[0] || null;
+
+    console.log(`[ProductPage][VariantSearch] color: ${color}, size: ${size} -> found variant:`, result ? {
+      id: result.id,
+      price: result.price,
+      stock: result.stock,
+      options: result.options
+    } : 'NOT FOUND');
+
+    return result;
   }, [product?.variants]);
 
   useEffect(() => {
     if (product && product.variants && product.variants.length > 0) {
       const newVariant = findVariantByColorAndSize(selectedColor, selectedSize);
       if (newVariant && newVariant.id !== selectedVariant?.id) {
+        console.log(`[ProductPage][VariantUpdate] Updating selected variant to:`, {
+          id: newVariant.id,
+          price: newVariant.price,
+          prevId: selectedVariant?.id
+        });
         setSelectedVariant(newVariant);
       }
     }
@@ -401,6 +432,7 @@ export default function ProductPage({ params }: ProductPageProps) {
   }, [currentImageIndex, images.length, thumbnailStartIndex]);
 
   const handleColorSelect = (color: string) => {
+    console.log(`[ProductPage][Selection] Color clicked: ${color} (previous: ${selectedColor})`);
     if (selectedColor === color) {
       setSelectedColor(null);
     } else {
@@ -435,6 +467,7 @@ export default function ProductPage({ params }: ProductPageProps) {
   };
 
   const handleSizeSelect = (size: string) => {
+    console.log(`[ProductPage][Selection] Size clicked: ${size} (previous: ${selectedSize})`);
     if (selectedSize === size) setSelectedSize(null);
     else setSelectedSize(size);
   };
