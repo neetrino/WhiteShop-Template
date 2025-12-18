@@ -2099,80 +2099,8 @@ function AddProductPageContent() {
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                        {/* Price - общая цена для всех цветов */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Price * (for all colors)
-                          </label>
-                          <Input
-                            type="text"
-                            inputMode="decimal"
-                            value={variant.price}
-                            onChange={(e) => {
-                              let value = e.target.value;
-                              value = value.replace(/[^\d.]/g, '');
-                              const parts = value.split('.');
-                              if (parts.length > 2) {
-                                value = parts[0] + '.' + parts.slice(1).join('');
-                              }
-                              if (parts.length === 2 && parts[1].length > 2) {
-                                value = parts[0] + '.' + parts[1].substring(0, 2);
-                              }
-                              updateVariant(variant.id, 'price', value);
-                            }}
-                            onBlur={(e) => {
-                              const value = e.target.value.trim();
-                              if (value && !isNaN(parseFloat(value))) {
-                                const numValue = parseFloat(value);
-                                if (numValue > 0) {
-                                  updateVariant(variant.id, 'price', numValue.toFixed(2));
-                                }
-                              }
-                            }}
-                            placeholder="0.00"
-                            required
-                            className="w-full"
-                          />
-                        </div>
-
-                        {/* Compare At Price */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Compare At Price
-                          </label>
-                          <Input
-                            type="text"
-                            inputMode="decimal"
-                            value={variant.compareAtPrice}
-                            onChange={(e) => {
-                              let value = e.target.value;
-                              value = value.replace(/[^\d.]/g, '');
-                              const parts = value.split('.');
-                              if (parts.length > 2) {
-                                value = parts[0] + '.' + parts.slice(1).join('');
-                              }
-                              if (parts.length === 2 && parts[1].length > 2) {
-                                value = parts[0] + '.' + parts[1].substring(0, 2);
-                              }
-                              updateVariant(variant.id, 'compareAtPrice', value);
-                            }}
-                            onBlur={(e) => {
-                              const value = e.target.value.trim();
-                              if (value && !isNaN(parseFloat(value))) {
-                                const numValue = parseFloat(value);
-                                if (numValue > 0) {
-                                  updateVariant(variant.id, 'compareAtPrice', numValue.toFixed(2));
-                                }
-                              }
-                            }}
-                            placeholder="0.00"
-                            className="w-full"
-                          />
-                        </div>
-
-
                         {/* SKU */}
-                        <div>
+                        <div className="md:col-span-2">
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             SKU *
                           </label>

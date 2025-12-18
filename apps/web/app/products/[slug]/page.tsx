@@ -516,6 +516,14 @@ export default function ProductPage({ params }: ProductPageProps) {
             {images.length > 0 ? (
               <img src={images[currentImageIndex]} alt={product.title} className="w-full h-full object-cover" />
             ) : <div className="w-full h-full flex items-center justify-center">No Image</div>}
+            
+            {/* Discount Badge on Image */}
+            {discountPercent && (
+              <div className="absolute top-3 left-3 bg-blue-600 text-white px-2.5 py-1.5 rounded-lg text-sm font-bold z-10 shadow-lg">
+                -{discountPercent}%
+              </div>
+            )}
+
             {product.labels && <ProductLabels labels={product.labels} />}
             <button onClick={() => setShowZoom(true)} className="absolute bottom-4 right-4 p-2 bg-white rounded-full shadow opacity-0 group-hover:opacity-100 transition-opacity">🔍</button>
           </div>
@@ -525,8 +533,14 @@ export default function ProductPage({ params }: ProductPageProps) {
           {product.brand && <p className="text-sm text-gray-500 mb-2">{product.brand.name}</p>}
           <h1 className="text-4xl font-bold text-gray-900 mb-4">{product.title}</h1>
           <div className="mb-6">
-            <p className="text-2xl font-bold text-gray-900">{formatPrice(price, currency)}</p>
-            {discountPercent && <span className="text-blue-600 bg-blue-50 px-2 py-1 rounded text-sm">-{discountPercent}%</span>}
+            <div className="flex flex-col gap-1">
+              <p className="text-3xl font-bold text-gray-900">{formatPrice(price, currency)}</p>
+              {(originalPrice || (compareAtPrice && compareAtPrice > price)) && (
+                <p className="text-xl text-gray-500 line-through decoration-gray-400">
+                  {formatPrice(originalPrice || compareAtPrice || 0, currency)}
+                </p>
+              )}
+            </div>
           </div>
           <div className="text-gray-600 mb-8 prose prose-sm" dangerouslySetInnerHTML={{ __html: product.description || '' }} />
 
