@@ -381,7 +381,7 @@ export function RelatedProducts({ categorySlug, currentProductId }: RelatedProdu
               onWheel={handleWheel}
             >
               <div
-                className="flex"
+                className="flex items-stretch"
                 style={{
                   transform: `translateX(-${currentIndex * (100 / visibleCards)}%)`,
                   transition: isDragging ? 'none' : 'transform 0.5s ease-in-out',
@@ -397,13 +397,13 @@ export function RelatedProducts({ categorySlug, currentProductId }: RelatedProdu
                   return (
                     <div
                       key={product.id}
-                      className="flex-shrink-0 px-3"
+                      className="flex-shrink-0 px-3 h-full"
                       style={{ width: `${100 / visibleCards}%` }}
                     >
-                      <div className="group relative">
+                      <div className="group relative h-full flex flex-col">
                         <Link
                           href={`/products/${product.slug}`}
-                          className="block cursor-pointer"
+                          className="block cursor-pointer flex-1 flex flex-col"
                           onClick={(e) => {
                             // Prevent navigation only if we actually dragged (moved more than threshold)
                             if (hasMoved) {
@@ -415,9 +415,9 @@ export function RelatedProducts({ categorySlug, currentProductId }: RelatedProdu
                             console.log('[RelatedProducts] Navigating to product:', product.slug);
                           }}
                         >
-                          <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                          <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col h-full">
                             {/* Product Image */}
-                            <div className="relative aspect-square bg-gray-100 overflow-hidden">
+                            <div className="relative aspect-square bg-gray-100 overflow-hidden flex-shrink-0">
                               <Image
                                 src={imageUrl}
                                 alt={product.title}
@@ -429,7 +429,7 @@ export function RelatedProducts({ categorySlug, currentProductId }: RelatedProdu
                             </div>
 
                             {/* Product Info */}
-                            <div className="p-4">
+                            <div className="p-4 flex flex-col flex-1">
                               {/* Title */}
                               <h3 className="text-sm font-semibold text-gray-900 mb-1 line-clamp-2 group-hover:text-gray-600 transition-colors">
                                 {product.title}
@@ -441,7 +441,7 @@ export function RelatedProducts({ categorySlug, currentProductId }: RelatedProdu
                               </p>
 
                               {/* Price */}
-                              <div className="flex items-center gap-2 flex-wrap">
+                              <div className="flex items-center gap-2 flex-wrap mt-auto">
                                 <div className="flex items-center gap-2">
                                   <span className="text-lg font-bold text-gray-900">
                                     {formatPrice(product.price, currency)}

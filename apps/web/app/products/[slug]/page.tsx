@@ -10,7 +10,7 @@ import { getStoredLanguage } from '../../../lib/language';
 import { useAuth } from '../../../lib/auth/AuthContext';
 import { RelatedProducts } from '../../../components/RelatedProducts';
 import { ProductReviews } from '../../../components/ProductReviews';
-import { Heart, Minus, Plus } from 'lucide-react';
+import { Heart, Minus, Plus, Maximize2 } from 'lucide-react';
 import { CompareIcon } from '../../../components/icons/CompareIcon';
 import { ProductLabels } from '../../../components/ProductLabels';
 
@@ -534,61 +534,155 @@ export default function ProductPage({ params }: ProductPageProps) {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-        <div className="flex gap-4">
-          <div className="flex flex-col items-center gap-2">
-            <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-1 lg:grid-cols-[55%_45%] gap-12 items-start">
+        <div className="flex gap-6 items-start">
+          {/* Left Column - Thumbnails (Vertical) */}
+          <div className="flex flex-col gap-4 w-28 flex-shrink-0">
+            <div className="flex flex-col gap-4 flex-1">
               {visibleThumbnails.map((image, index) => {
                 const actualIndex = thumbnailStartIndex + index;
                 const isActive = actualIndex === currentImageIndex;
                 return (
-                  <button key={actualIndex} onClick={() => setCurrentImageIndex(actualIndex)}
-                    className={`relative w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${isActive ? 'border-gray-900 shadow-md' : 'border-gray-200'}`}>
-                    <img src={image} alt="" className="w-full h-full object-cover" />
+                  <button 
+                    key={actualIndex} 
+                    onClick={() => setCurrentImageIndex(actualIndex)}
+                    className={`relative w-full aspect-[3/4] rounded-lg overflow-hidden border bg-white transition-all duration-300 ${
+                      isActive 
+                        ? 'border-gray-400 shadow-[0_2px_8px_rgba(0,0,0,0.12)] ring-2 ring-gray-300' 
+                        : 'border-gray-200 hover:border-gray-300 hover:shadow-[0_2px_6px_rgba(0,0,0,0.08)]'
+                    }`}
+                  >
+                    <img 
+                      src={image} 
+                      alt="" 
+                      className="w-full h-full object-cover transition-transform duration-300" 
+                    />
                   </button>
                 );
               })}
             </div>
+            
+            {/* Navigation Arrows - Both at the bottom, side by side */}
             {images.length > thumbnailsPerView && (
-              <div className="flex flex-col gap-1">
-                <button onClick={() => setThumbnailStartIndex(Math.max(0, thumbnailStartIndex - 1))} className="p-1 border rounded">▲</button>
-                <button onClick={() => setThumbnailStartIndex(Math.min(images.length - thumbnailsPerView, thumbnailStartIndex + 1))} className="p-1 border rounded">▼</button>
+              <div className="flex flex-row gap-1.5 justify-center">
+                <button 
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const newIndex = Math.max(0, currentImageIndex - 1);
+                    setCurrentImageIndex(newIndex);
+                    // Update thumbnail scroll to show the new image
+                    if (newIndex < thumbnailStartIndex) {
+                      setThumbnailStartIndex(newIndex);
+                    }
+                  }}
+                  disabled={currentImageIndex <= 0}
+                  className="w-9 h-9 rounded border transition-all duration-200 flex items-center justify-center border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-200 hover:shadow-[0_1px_3px_rgba(0,0,0,0.1)] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-gray-100 disabled:hover:border-gray-300 disabled:hover:shadow-none bg-gray-100"
+                  aria-label="Previous thumbnail"
+                >
+                  <svg 
+                    className="w-4 h-4" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      strokeWidth={2.5} 
+                      d="M5 15l7-7 7 7" 
+                    />
+                  </svg>
+                </button>
+                <button 
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const newIndex = Math.min(images.length - 1, currentImageIndex + 1);
+                    setCurrentImageIndex(newIndex);
+                    // Update thumbnail scroll to show the new image
+                    if (newIndex >= thumbnailStartIndex + thumbnailsPerView) {
+                      setThumbnailStartIndex(newIndex - thumbnailsPerView + 1);
+                    }
+                  }}
+                  disabled={currentImageIndex >= images.length - 1}
+                  className="w-9 h-9 rounded border transition-all duration-200 flex items-center justify-center border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-200 hover:shadow-[0_1px_3px_rgba(0,0,0,0.1)] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-gray-100 disabled:hover:border-gray-300 disabled:hover:shadow-none bg-gray-100"
+                  aria-label="Next thumbnail"
+                >
+                  <svg 
+                    className="w-4 h-4" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      strokeWidth={2.5} 
+                      d="M19 9l-7 7-7-7" 
+                    />
+                  </svg>
+                </button>
               </div>
             )}
           </div>
-          <div className="flex-1 relative aspect-square bg-gray-100 rounded-lg overflow-hidden group">
+          
+          {/* Right Column - Main Image */}
+          <div className="flex-1">
+            <div className="relative aspect-square bg-white rounded-lg overflow-hidden group shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
             {images.length > 0 ? (
-              <img src={images[currentImageIndex]} alt={product.title} className="w-full h-full object-cover" />
-            ) : <div className="w-full h-full flex items-center justify-center">No Image</div>}
+              <img 
+                src={images[currentImageIndex]} 
+                alt={product.title} 
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-400">No Image</div>
+            )}
             
-            {/* Discount Badge on Image */}
+            {/* Discount Badge on Image - Blue circle in top-right */}
             {discountPercent && (
-              <div className="absolute top-3 left-3 bg-blue-600 text-white px-2.5 py-1.5 rounded-lg text-sm font-bold z-10 shadow-lg">
+              <div className="absolute top-4 right-4 w-14 h-14 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold z-10 shadow-[0_2px_8px_rgba(37,99,235,0.3)]">
                 -{discountPercent}%
               </div>
             )}
 
             {product.labels && <ProductLabels labels={product.labels} />}
-            <button onClick={() => setShowZoom(true)} className="absolute bottom-4 right-4 p-2 bg-white rounded-full shadow opacity-0 group-hover:opacity-100 transition-opacity">🔍</button>
+            
+            {/* Control Buttons - Bottom left */}
+            <div className="absolute bottom-4 left-4 flex flex-col gap-3 z-10">
+              {/* Fullscreen Button */}
+              <button 
+                onClick={() => setShowZoom(true)} 
+                className="w-12 h-12 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center border border-white/50 shadow-[0_2px_8px_rgba(0,0,0,0.15)] hover:bg-white/90 transition-all duration-300 hover:shadow-[0_4px_12px_rgba(0,0,0,0.2)]"
+                aria-label="Fullscreen image"
+              >
+                <Maximize2 className="w-5 h-5 text-gray-800" />
+              </button>
+            </div>
+            </div>
           </div>
         </div>
 
-        <div>
-          {product.brand && <p className="text-sm text-gray-500 mb-2">{product.brand.name}</p>}
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">{product.title}</h1>
-          <div className="mb-6">
-            <div className="flex flex-col gap-1">
-              <p className="text-3xl font-bold text-gray-900">{formatPrice(price, currency)}</p>
-              {(originalPrice || (compareAtPrice && compareAtPrice > price)) && (
-                <p className="text-xl text-gray-500 line-through decoration-gray-400">
-                  {formatPrice(originalPrice || compareAtPrice || 0, currency)}
-                </p>
-              )}
+        <div className="flex flex-col h-full">
+          <div className="flex-1">
+            {product.brand && <p className="text-sm text-gray-500 mb-2">{product.brand.name}</p>}
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">{product.title}</h1>
+            <div className="mb-6">
+              <div className="flex flex-col gap-1">
+                <p className="text-3xl font-bold text-gray-900">{formatPrice(price, currency)}</p>
+                {(originalPrice || (compareAtPrice && compareAtPrice > price)) && (
+                  <p className="text-xl text-gray-500 line-through decoration-gray-400">
+                    {formatPrice(originalPrice || compareAtPrice || 0, currency)}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-          <div className="text-gray-600 mb-8 prose prose-sm" dangerouslySetInnerHTML={{ __html: product.description || '' }} />
+            <div className="text-gray-600 mb-8 prose prose-sm" dangerouslySetInnerHTML={{ __html: product.description || '' }} />
 
-          <div className="mt-8 p-6 bg-white border border-gray-200 rounded-2xl space-y-5">
+            <div className="mt-8 p-6 bg-white border border-gray-200 rounded-2xl space-y-5">
             {colorGroups.length > 0 && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">Color:</label>
@@ -655,6 +749,11 @@ export default function ProductPage({ params }: ProductPageProps) {
               </div>
             )}
 
+            </div>
+          </div>
+          
+          {/* Action Buttons - Aligned with bottom of image */}
+          <div className="mt-auto pt-6">
             <div className="flex items-center gap-3 pt-4 border-t">
               <div className="flex items-center border rounded-xl overflow-hidden bg-gray-50">
                 <button onClick={() => adjustQuantity(-1)} className="w-12 h-12 flex items-center justify-center">-</button>
