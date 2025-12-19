@@ -163,7 +163,7 @@ export default function OrderDetailsPage() {
           <div className="space-y-6">
             {/* Summary */}
             <Card className="p-4 md:p-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <h2 className="text-sm font-semibold text-gray-900 mb-2">Summary</h2>
                   <div className="text-sm text-gray-700 space-y-1">
@@ -180,9 +180,6 @@ export default function OrderDetailsPage() {
                     <div>
                       <span className="font-medium">Payment:</span> {order.paymentStatus}
                     </div>
-                    <div>
-                      <span className="font-medium">Fulfillment:</span> {order.fulfillmentStatus}
-                    </div>
                   </div>
                 </div>
 
@@ -198,32 +195,11 @@ export default function OrderDetailsPage() {
                     {order.customerEmail && <div>{order.customerEmail}</div>}
                   </div>
                 </div>
-
-                <div>
-                  <h2 className="text-sm font-semibold text-gray-900 mb-2">Meta</h2>
-                  <div className="text-sm text-gray-700 space-y-1">
-                    {order.shippingMethod && (
-                      <div>
-                        <span className="font-medium">Shipping method:</span> {order.shippingMethod}
-                      </div>
-                    )}
-                    {order.notes && (
-                      <div>
-                        <span className="font-medium">Customer notes:</span> {order.notes}
-                      </div>
-                    )}
-                    {order.adminNotes && (
-                      <div>
-                        <span className="font-medium">Admin notes:</span> {order.adminNotes}
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div>
             </Card>
 
             {/* Addresses & Payment */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card className="p-4 md:p-6">
                 <h2 className="text-sm font-semibold text-gray-900 mb-2">Shipping Address</h2>
                 {order.shippingAddress ? (
@@ -231,18 +207,11 @@ export default function OrderDetailsPage() {
                     {JSON.stringify(order.shippingAddress, null, 2)}
                   </pre>
                 ) : (
-                  <div className="text-sm text-gray-500">No shipping address</div>
-                )}
-              </Card>
-
-              <Card className="p-4 md:p-6">
-                <h2 className="text-sm font-semibold text-gray-900 mb-2">Billing Address</h2>
-                {order.billingAddress ? (
-                  <pre className="text-xs bg-gray-50 p-2 rounded border border-gray-200 overflow-x-auto">
-                    {JSON.stringify(order.billingAddress, null, 2)}
-                  </pre>
-                ) : (
-                  <div className="text-sm text-gray-500">No billing address</div>
+                  <div className="text-sm text-gray-500">
+                    <p>No shipping address</p>
+                    <p>Shipping method: pickup </p>
+                  </div>
+                  
                 )}
               </Card>
 
@@ -250,7 +219,6 @@ export default function OrderDetailsPage() {
                 <h2 className="text-sm font-semibold text-gray-900 mb-2">Payment</h2>
                 {order.payment ? (
                   <div className="text-sm text-gray-700 space-y-1">
-                    <div>Provider: {order.payment.provider}</div>
                     {order.payment.method && <div>Method: {order.payment.method}</div>}
                     <div>
                       Amount:{' '}
