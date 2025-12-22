@@ -161,7 +161,6 @@ function AddProductPageContent() {
   const [formData, setFormData] = useState({
     title: '',
     slug: '',
-    subtitle: '',
     descriptionHtml: '',
     brandId: '',
     primaryCategoryId: '',
@@ -400,7 +399,6 @@ function AddProductPageContent() {
           setFormData({
             title: product.title || '',
             slug: product.slug || '',
-            subtitle: product.subtitle || '',
             descriptionHtml: product.descriptionHtml || '',
             brandId: product.brandId || '',
             primaryCategoryId: product.primaryCategoryId || '',
@@ -1502,7 +1500,6 @@ function AddProductPageContent() {
       const payload: any = {
         title: formData.title,
         slug: formData.slug,
-        subtitle: formData.subtitle || undefined,
         descriptionHtml: formData.descriptionHtml || undefined,
         brandId: finalBrandId || undefined,
         primaryCategoryId: finalPrimaryCategoryId || undefined,
@@ -1640,18 +1637,6 @@ function AddProductPageContent() {
                     onChange={(e) => setFormData((prev) => ({ ...prev, slug: e.target.value }))}
                     required
                     placeholder="product-slug"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Subtitle
-                  </label>
-                  <Input
-                    type="text"
-                    value={formData.subtitle}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, subtitle: e.target.value }))}
-                    placeholder="Product subtitle"
                   />
                 </div>
 

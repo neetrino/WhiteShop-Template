@@ -1944,6 +1944,101 @@ class AdminService {
   }
 
   /**
+   * Update brand
+   */
+  async updateBrand(
+    brandId: string,
+    data: {
+      name?: string;
+      locale?: string;
+      logoUrl?: string;
+    }
+  ) {
+    console.log('🔄 [ADMIN SERVICE] updateBrand called:', brandId, data);
+    
+    const brand = await db.brand.findUnique({
+      where: { id: brandId },
+      include: {
+        translations: true,
+      },
+    });
+
+    if (!brand) {
+      throw {
+        status: 404,
+        type: "https://api.shop.am/problems/not-found",
+        title: "Brand not found",
+        detail: `Brand with id '${brandId}' does not exist`,
+      };
+    }
+
+    const locale = data.locale || "en";
+    const updateData: any = {};
+
+    // Update logo URL if provided
+    if (data.logoUrl !== undefined) {
+      updateData.logoUrl = data.logoUrl || null;
+    }
+
+    // Update translation if name is provided
+    if (data.name !== undefined) {
+      const brandTranslations = Array.isArray(brand.translations) ? brand.translations : [];
+      const existingTranslation = brandTranslations.find(
+        (t: { locale: string }) => t.locale === locale
+      );
+
+      if (existingTranslation) {
+        // Update existing translation
+        await db.brandTranslation.update({
+          where: { id: existingTranslation.id },
+          data: { name: data.name },
+        });
+      } else {
+        // Create new translation
+        await db.brandTranslation.create({
+          data: {
+            brandId: brand.id,
+            locale,
+            name: data.name,
+          },
+        });
+      }
+    }
+
+    // Update brand base data if needed
+    if (Object.keys(updateData).length > 0) {
+      await db.brand.update({
+        where: { id: brandId },
+        data: updateData,
+      });
+    }
+
+    // Fetch updated brand with translations
+    const updatedBrand = await db.brand.findUnique({
+      where: { id: brandId },
+      include: {
+        translations: {
+          where: { locale },
+          take: 1,
+        },
+      },
+    });
+
+    const brandTranslations = Array.isArray(updatedBrand?.translations) 
+      ? updatedBrand.translations 
+      : [];
+    const translation = brandTranslations[0] || null;
+
+    return {
+      data: {
+        id: updatedBrand!.id,
+        name: translation?.name || "",
+        slug: updatedBrand!.slug,
+      },
+    };
+  }
+
+  /**
    * Delete brand (soft delete)
    */
   async deleteBrand(brandId: string) {
