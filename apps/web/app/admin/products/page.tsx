@@ -475,15 +475,6 @@ export default function ProductsPage() {
           </button>
           <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold text-gray-900">Products</h1>
-            <Button
-              variant="primary"
-              onClick={() => router.push('/admin/products/add')}
-            >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add New Product
-            </Button>
           </div>
         </div>
 
@@ -629,6 +620,19 @@ export default function ProductsPage() {
             </Button>
           </div>
 
+        </div>
+
+        {/* Add Product Form Section - Collapsible */}
+        <div className="mb-6">
+          <button
+            onClick={() => router.push('/admin/products/add')}
+            className="w-full px-4 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 font-medium"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add New Product
+          </button>
         </div>
 
         {/* Products Table */}

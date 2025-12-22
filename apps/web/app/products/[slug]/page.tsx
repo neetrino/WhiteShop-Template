@@ -27,6 +27,8 @@ interface VariantOption {
   attribute: string;
   value: string;
   key: string;
+  valueId?: string; // New format: AttributeValue ID
+  attributeId?: string; // New format: Attribute ID
 }
 
 interface ProductVariant {
@@ -51,6 +53,20 @@ interface ProductLabel {
   color: string | null;
 }
 
+interface ProductAttribute {
+  id: string;
+  attribute: {
+    id: string;
+    key: string;
+    name: string;
+    values: Array<{
+      id: string;
+      value: string;
+      label: string;
+    }>;
+  };
+}
+
 interface Product {
   id: string;
   slug: string;
@@ -69,6 +85,7 @@ interface Product {
     slug: string;
     title: string;
   }>;
+  productAttributes?: ProductAttribute[];
   productDiscount?: number | null;
   globalDiscount?: number | null;
 }
@@ -321,11 +338,18 @@ export default function ProductPage({ params }: ProductPageProps) {
     const normalizedColor = color?.toLowerCase().trim();
     const normalizedSize = size?.toLowerCase().trim();
 
+    // Helper function to get option value (supports both new and old format)
+    const getOptionValue = (options: VariantOption[] | undefined, key: string): string | null => {
+      if (!options) return null;
+      const opt = options.find(o => o.key === key || o.attribute === key);
+      return opt?.value?.toLowerCase().trim() || null;
+    };
+
     // 1. Try exact match (Case-insensitive)
     if (normalizedColor && normalizedSize) {
       const variant = product.variants.find(v => {
-        const vColor = v.options?.find(opt => opt.key === 'color')?.value.toLowerCase().trim();
-        const vSize = v.options?.find(opt => opt.key === 'size')?.value.toLowerCase().trim();
+        const vColor = getOptionValue(v.options, 'color');
+        const vSize = getOptionValue(v.options, 'size');
         return vColor === normalizedColor && vSize === normalizedSize;
       });
       if (variant) return variant;
@@ -334,9 +358,10 @@ export default function ProductPage({ params }: ProductPageProps) {
     // 2. If color selected but no exact match with size, find any variant of this color
     if (normalizedColor) {
       // Prefer in-stock variant of this color
-      const colorVariants = product.variants.filter(v => 
-        v.options?.find(opt => opt.key === 'color')?.value.toLowerCase().trim() === normalizedColor
-      );
+      const colorVariants = product.variants.filter(v => {
+        const vColor = getOptionValue(v.options, 'color');
+        return vColor === normalizedColor;
+      });
       
       if (colorVariants.length > 0) {
         return colorVariants.find(v => v.stock > 0) || colorVariants[0];
@@ -345,9 +370,10 @@ export default function ProductPage({ params }: ProductPageProps) {
 
     // 3. If only size selected or fallback for size
     if (normalizedSize) {
-      const sizeVariants = product.variants.filter(v => 
-        v.options?.find(opt => opt.key === 'size')?.value.toLowerCase().trim() === normalizedSize
-      );
+      const sizeVariants = product.variants.filter(v => {
+        const vSize = getOptionValue(v.options, 'size');
+        return vSize === normalizedSize;
+      });
       
       if (sizeVariants.length > 0) {
         return sizeVariants.find(v => v.stock > 0) || sizeVariants[0];
@@ -356,7 +382,7 @@ export default function ProductPage({ params }: ProductPageProps) {
 
     // 4. Ultimate fallback
     return product.variants.find(v => v.stock > 0) || product.variants[0] || null;
-  }, [product?.variants]);
+  }, [product?.variants, getOptionValue]);
 
   useEffect(() => {
     if (product && product.variants && product.variants.length > 0) {
@@ -365,46 +391,138 @@ export default function ProductPage({ params }: ProductPageProps) {
       if (newVariant && newVariant.id !== selectedVariant?.id) {
         setSelectedVariant(newVariant);
         
-        // Synchronize selection states with the found variant
-        const colorOpt = newVariant.options?.find(o => o.key === 'color');
-        const sizeOpt = newVariant.options?.find(o => o.key === 'size');
+        // Synchronize selection states with the found variant (supports both formats)
+        const colorValue = getOptionValue(newVariant.options, 'color');
+        const sizeValue = getOptionValue(newVariant.options, 'size');
         
-        if (colorOpt && colorOpt.value !== selectedColor) {
-          setSelectedColor(colorOpt.value);
+        if (colorValue && colorValue !== selectedColor?.toLowerCase().trim()) {
+          setSelectedColor(colorValue);
         }
-        if (sizeOpt && sizeOpt.value !== selectedSize) {
-          setSelectedSize(sizeOpt.value);
+        if (sizeValue && sizeValue !== selectedSize?.toLowerCase().trim()) {
+          setSelectedSize(sizeValue);
         }
       }
     }
   }, [selectedColor, selectedSize, findVariantByColorAndSize, selectedVariant?.id, product]);
 
+  // Build attribute groups from productAttributes (new format) or from variants (old format)
+  const attributeGroups = new Map<string, Array<{
+    valueId?: string;
+    value: string;
+    label: string;
+    stock: number;
+    variants: ProductVariant[];
+  }>>();
+
+  if (product?.productAttributes && product.productAttributes.length > 0) {
+    // New format: Use productAttributes
+    product.productAttributes.forEach((productAttr) => {
+      const attrKey = productAttr.attribute.key;
+      const valueMap = new Map<string, { valueId: string; value: string; label: string; variants: ProductVariant[] }>();
+
+      product.variants?.forEach((variant) => {
+        const option = variant.options?.find((opt) => {
+          if (opt.valueId && opt.attributeId === productAttr.attribute.id) {
+            return true;
+          }
+          return opt.key === attrKey || opt.attribute === attrKey;
+        });
+
+        if (option) {
+          const valueId = option.valueId || '';
+          const value = option.value || '';
+          // Get label from AttributeValue if available, otherwise use value
+          let label = option.value || '';
+          if (valueId && productAttr.attribute.values) {
+            const attrValue = productAttr.attribute.values.find((v: any) => v.id === valueId);
+            if (attrValue) {
+              label = attrValue.label || attrValue.value || value;
+            }
+          }
+
+          const mapKey = valueId || value;
+          if (!valueMap.has(mapKey)) {
+            valueMap.set(mapKey, {
+              valueId: valueId || undefined,
+              value,
+              label,
+              variants: [],
+            });
+          }
+          valueMap.get(mapKey)!.variants.push(variant);
+        }
+      });
+
+      const groups = Array.from(valueMap.values()).map((item) => ({
+        valueId: item.valueId,
+        value: item.value,
+        label: item.label,
+        stock: item.variants.reduce((sum, v) => sum + v.stock, 0),
+        variants: item.variants,
+      }));
+
+      attributeGroups.set(attrKey, groups);
+    });
+  } else {
+    // Old format: Extract from variants
+    if (product?.variants) {
+      const colorMap = new Map<string, ProductVariant[]>();
+      const sizeMap = new Map<string, ProductVariant[]>();
+
+      product.variants.forEach((variant) => {
+        const color = getOptionValue(variant.options, 'color');
+        const size = getOptionValue(variant.options, 'size');
+
+        if (color) {
+          if (!colorMap.has(color)) colorMap.set(color, []);
+          colorMap.get(color)!.push(variant);
+        }
+
+        if (size) {
+          if (!sizeMap.has(size)) sizeMap.set(size, []);
+          sizeMap.get(size)!.push(variant);
+        }
+      });
+
+      if (colorMap.size > 0) {
+        attributeGroups.set('color', Array.from(colorMap.entries()).map(([value, variants]) => ({
+          value,
+          label: value,
+          stock: variants.reduce((sum, v) => sum + v.stock, 0),
+          variants,
+        })));
+      }
+
+      if (sizeMap.size > 0) {
+        attributeGroups.set('size', Array.from(sizeMap.entries()).map(([value, variants]) => ({
+          value,
+          label: value,
+          stock: variants.reduce((sum, v) => sum + v.stock, 0),
+          variants,
+        })));
+      }
+    }
+  }
+
+  // Backward compatibility: Keep colorGroups and sizeGroups for existing UI
   const colorGroups: Array<{ color: string; stock: number; variants: ProductVariant[] }> = [];
-  if (product?.variants) {
-    const colorMap = new Map<string, ProductVariant[]>();
-    product.variants.forEach(variant => {
-      const color = variant.options?.find(opt => opt.key === 'color')?.value || 'default';
-      if (!colorMap.has(color)) colorMap.set(color, []);
-      colorMap.get(color)!.push(variant);
-    });
-    colorMap.forEach((variants, color) => {
-      const totalStock = variants.reduce((sum, v) => sum + v.stock, 0);
-      colorGroups.push({ color, stock: totalStock, variants });
-    });
+  const colorAttrGroup = attributeGroups.get('color');
+  if (colorAttrGroup) {
+    colorGroups.push(...colorAttrGroup.map((g) => ({
+      color: g.value,
+      stock: g.stock,
+      variants: g.variants,
+    })));
   }
 
   const sizeGroups: Array<{ size: string; stock: number; variants: ProductVariant[] }> = [];
-  if (product?.variants) {
-    const sizeMap = new Map<string, ProductVariant[]>();
-    product.variants.forEach(variant => {
-      const size = variant.options?.find(opt => opt.key === 'size')?.value || 'default';
-      if (!sizeMap.has(size)) sizeMap.set(size, []);
-      sizeMap.get(size)!.push(variant);
-    });
-    sizeMap.forEach((variants, size) => {
-      const totalStock = variants.reduce((sum, v) => sum + v.stock, 0);
-      sizeGroups.push({ size, stock: totalStock, variants });
-    });
+  const sizeAttrGroup = attributeGroups.get('size');
+  if (sizeAttrGroup) {
+    sizeGroups.push(...sizeAttrGroup.map((g) => ({
+      size: g.value,
+      stock: g.stock,
+      variants: g.variants,
+    })));
   }
 
   const currentVariant = selectedVariant || findVariantByColorAndSize(selectedColor, selectedSize) || product?.variants?.[0] || null;
@@ -452,10 +570,10 @@ export default function ProductPage({ params }: ProductPageProps) {
       
       // Find the first image associated with this color and jump to it
       if (product?.variants) {
-        const variantWithImage = product.variants.find(v => 
-          v.options?.some(opt => opt.key === 'color' && opt.value === color) && 
-          v.imageUrl
-        );
+        const variantWithImage = product.variants.find(v => {
+          const colorOpt = getOptionValue(v.options, 'color');
+          return colorOpt === color.toLowerCase().trim() && v.imageUrl;
+        });
         
         if (variantWithImage && variantWithImage.imageUrl) {
           const firstColorImageUrl = smartSplitUrls(variantWithImage.imageUrl)[0];
@@ -711,43 +829,167 @@ export default function ProductPage({ params }: ProductPageProps) {
               </span>
             </div>
 
-            {colorGroups.length > 0 && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Color:</label>
-                <div className="flex flex-wrap gap-2">
-                  {colorGroups.map((g) => {
-                    const isSelected = selectedColor === g.color;
-                    const isDisabled = g.stock <= 0;
-                    
-                    return (
-                      <button 
-                        key={g.color} 
-                        onClick={() => !isDisabled && handleColorSelect(g.color)}
-                        disabled={isDisabled}
-                        className={`w-10 h-10 rounded-full border-2 transition-all ${
-                          isSelected 
-                            ? 'border-gray-900 ring-2 ring-offset-2 ring-gray-900 scale-110' 
-                            : isDisabled 
-                              ? 'border-gray-100 opacity-30 grayscale cursor-not-allowed' 
-                              : 'border-gray-300 hover:scale-105'
-                        }`}
-                        style={{ backgroundColor: getColorValue(g.color) }} 
-                        title={isDisabled ? `${g.color} (Out of Stock)` : g.color} 
-                      />
-                    );
-                  })}
-                </div>
-              </div>
+            {/* Attribute Selectors - Support both new (productAttributes) and old (colorGroups) format */}
+            {product?.productAttributes && product.productAttributes.length > 0 ? (
+              // New format: Use productAttributes
+              product.productAttributes.map((productAttr) => {
+                const attrKey = productAttr.attribute.key;
+                const attrGroups = attributeGroups.get(attrKey) || [];
+                const isColor = attrKey === 'color';
+                const isSize = attrKey === 'size';
+
+                if (attrGroups.length === 0) return null;
+
+                return (
+                  <div key={attrKey} className="space-y-2">
+                    <label className="text-sm font-bold uppercase">{productAttr.attribute.name}:</label>
+                    {isColor ? (
+                      <div className="flex flex-wrap gap-2">
+                        {attrGroups.map((g) => {
+                          const isSelected = selectedColor === g.value.toLowerCase().trim();
+                          const isDisabled = g.stock <= 0;
+                          
+                          return (
+                            <button 
+                              key={g.valueId || g.value} 
+                              onClick={() => !isDisabled && handleColorSelect(g.value)}
+                              disabled={isDisabled}
+                              className={`w-10 h-10 rounded-full border-2 transition-all ${
+                                isSelected 
+                                  ? 'border-gray-900 ring-2 ring-offset-2 ring-gray-900 scale-110' 
+                                  : isDisabled 
+                                    ? 'border-gray-100 opacity-30 grayscale cursor-not-allowed' 
+                                    : 'border-gray-300 hover:scale-105'
+                              }`}
+                              style={{ backgroundColor: getColorValue(g.value) }} 
+                              title={isDisabled ? `${g.label} (Out of Stock)` : g.label} 
+                            />
+                          );
+                        })}
+                      </div>
+                    ) : isSize ? (
+                      <div className="flex flex-wrap gap-2">
+                        {attrGroups.map((g) => {
+                          let displayStock = g.stock;
+                          if (selectedColor) {
+                            const v = g.variants.find(v => {
+                              const colorOpt = getOptionValue(v.options, 'color');
+                              return colorOpt === selectedColor.toLowerCase().trim();
+                            });
+                            displayStock = v ? v.stock : 0;
+                          }
+                          const isSelected = selectedSize === g.value.toLowerCase().trim();
+                          const isDisabled = displayStock <= 0;
+
+                          return (
+                            <button 
+                              key={g.valueId || g.value}
+                              onClick={() => !isDisabled && handleSizeSelect(g.value)}
+                              disabled={isDisabled}
+                              className={`min-w-[50px] px-3 py-2 rounded-lg border-2 transition-all ${
+                                isSelected 
+                                  ? 'border-gray-900 bg-gray-50' 
+                                  : isDisabled 
+                                    ? 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed' 
+                                    : 'border-gray-200 hover:border-gray-400'
+                              }`}
+                            >
+                              <div className="flex flex-col text-center">
+                                <span className="text-sm font-medium">{g.label}</span>
+                                {displayStock > 0 && (
+                                  <span className="text-xs text-gray-500">({displayStock})</span>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      // Generic attribute selector
+                      <div className="flex flex-wrap gap-2">
+                        {attrGroups.map((g) => {
+                          const selectedValueId = selectedAttributeValues.get(attrKey);
+                          const isSelected = selectedValueId === g.valueId || (!g.valueId && selectedColor === g.value);
+                          const isDisabled = g.stock <= 0;
+
+                          return (
+                            <button
+                              key={g.valueId || g.value}
+                              onClick={() => {
+                                if (!isDisabled) {
+                                  const newMap = new Map(selectedAttributeValues);
+                                  if (isSelected) {
+                                    newMap.delete(attrKey);
+                                  } else {
+                                    newMap.set(attrKey, g.valueId || g.value);
+                                  }
+                                  setSelectedAttributeValues(newMap);
+                                }
+                              }}
+                              disabled={isDisabled}
+                              className={`px-4 py-2 rounded-lg border-2 transition-all ${
+                                isSelected
+                                  ? 'border-gray-900 bg-gray-50'
+                                  : isDisabled
+                                    ? 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
+                                    : 'border-gray-200 hover:border-gray-400'
+                              }`}
+                            >
+                              {g.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              // Old format: Use colorGroups and sizeGroups
+              <>
+                {colorGroups.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Color:</label>
+                    <div className="flex flex-wrap gap-2">
+                      {colorGroups.map((g) => {
+                        const isSelected = selectedColor === g.color;
+                        const isDisabled = g.stock <= 0;
+                        
+                        return (
+                          <button 
+                            key={g.color} 
+                            onClick={() => !isDisabled && handleColorSelect(g.color)}
+                            disabled={isDisabled}
+                            className={`w-10 h-10 rounded-full border-2 transition-all ${
+                              isSelected 
+                                ? 'border-gray-900 ring-2 ring-offset-2 ring-gray-900 scale-110' 
+                                : isDisabled 
+                                  ? 'border-gray-100 opacity-30 grayscale cursor-not-allowed' 
+                                  : 'border-gray-300 hover:scale-105'
+                            }`}
+                            style={{ backgroundColor: getColorValue(g.color) }} 
+                            title={isDisabled ? `${g.color} (Out of Stock)` : g.color} 
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
-            {sizeGroups.length > 0 && (
+            {/* Size Groups - Show only if not using new format */}
+            {!product?.productAttributes && sizeGroups.length > 0 && (
               <div className="space-y-2">
                 <label className="text-sm font-bold uppercase">Size</label>
                 <div className="flex flex-wrap gap-2">
                   {sizeGroups.map((g) => {
                     let displayStock = g.stock;
                     if (selectedColor) {
-                      const v = g.variants.find(v => v.options?.some(opt => opt.key === 'color' && opt.value === selectedColor));
+                      const v = g.variants.find(v => {
+                        const colorOpt = getOptionValue(v.options, 'color');
+                        return colorOpt === selectedColor.toLowerCase().trim();
+                      });
                       displayStock = v ? v.stock : 0;
                     }
                     const isSelected = selectedSize === g.size;

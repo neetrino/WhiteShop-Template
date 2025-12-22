@@ -19,8 +19,18 @@ if (!databaseUrl.includes('client_encoding')) {
 export const db =
   globalForPrisma.prisma ??
   new PrismaClient({ 
-    log: ["query", "error", "warn"],
+    log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+    errorFormat: "pretty",
   });
+
+// Handle Prisma connection errors
+db.$connect().catch((error) => {
+  console.error("❌ [DB] Prisma connection error:", {
+    message: error?.message,
+    code: error?.code,
+    name: error?.name,
+  });
+});
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = db;
 

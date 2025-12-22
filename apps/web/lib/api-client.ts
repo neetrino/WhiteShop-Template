@@ -613,20 +613,56 @@ class ApiClient {
           try {
             errorData = JSON.parse(errorText);
             if (this.shouldLogError(response.status)) {
-              console.error('❌ [API CLIENT] DELETE Error response (JSON):', errorData);
+              console.error('❌ [API CLIENT] DELETE Error response:', {
+                status: response.status,
+                statusText: response.statusText,
+                url: url,
+                error: {
+                  type: errorData?.type,
+                  title: errorData?.title,
+                  status: errorData?.status,
+                  detail: errorData?.detail,
+                  message: errorData?.message,
+                  instance: errorData?.instance,
+                  fullData: errorData,
+                },
+                rawText: errorText,
+              });
             }
           } catch (parseErr) {
             // If JSON parse fails, use text as is
             if (this.shouldLogError(response.status)) {
-              console.error('❌ [API CLIENT] DELETE Error response (text):', errorText);
+              console.error('❌ [API CLIENT] DELETE Error response (text, parse failed):', {
+                status: response.status,
+                statusText: response.statusText,
+                url: url,
+                errorText: errorText,
+                parseError: parseErr,
+              });
             }
           }
         } else if (errorText && this.shouldLogError(response.status)) {
-          console.error('❌ [API CLIENT] DELETE Error response (text):', errorText);
+          console.error('❌ [API CLIENT] DELETE Error response (text):', {
+            status: response.status,
+            statusText: response.statusText,
+            url: url,
+            errorText: errorText,
+          });
+        } else if (this.shouldLogError(response.status)) {
+          console.error('❌ [API CLIENT] DELETE Error response (no body):', {
+            status: response.status,
+            statusText: response.statusText,
+            url: url,
+          });
         }
       } catch (e) {
         if (this.shouldLogError(response.status)) {
-          console.error('❌ [API CLIENT] Failed to read error response:', e);
+          console.error('❌ [API CLIENT] Failed to read error response:', {
+            status: response.status,
+            statusText: response.statusText,
+            url: url,
+            error: e,
+          });
         }
       }
       

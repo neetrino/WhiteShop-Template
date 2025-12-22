@@ -188,6 +188,24 @@ function AddProductPageContent() {
   const [addingSize, setAddingSize] = useState(false);
   const [colorMessage, setColorMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [sizeMessage, setSizeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [selectedAttributeId, setSelectedAttributeId] = useState<string | null>(null);
+  const [newAttributeName, setNewAttributeName] = useState('');
+  const [addingAttribute, setAddingAttribute] = useState(false);
+  const [newAttributeValue, setNewAttributeValue] = useState('');
+  const [addingAttributeValue, setAddingAttributeValue] = useState(false);
+  const [deletingAttribute, setDeletingAttribute] = useState<string | null>(null);
+  const [deletingAttributeValue, setDeletingAttributeValue] = useState<string | null>(null);
+  
+  // Matrix Variant Builder state
+  const [matrixSelectedColors, setMatrixSelectedColors] = useState<string[]>([]); // Array of color values
+  const [matrixSelectedSizes, setMatrixSelectedSizes] = useState<string[]>([]); // Array of size values
+  const [matrixVariants, setMatrixVariants] = useState<Record<string, {
+    price: string;
+    compareAtPrice: string;
+    stock: string;
+    sku: string;
+  }>>({}); // Key: "colorValue-sizeValue", Value: variant data
+  const [useMatrixBuilder, setUseMatrixBuilder] = useState(false);
 
   useEffect(() => {
     if (!isLoading) {
@@ -1370,7 +1388,15 @@ function AddProductPageContent() {
                 : '';
               
               // Generate SKU if not provided
-              let finalSku = variant.sku ? `${variant.sku.trim()}${skuSuffix}` : undefined;
+              // First check if there's a specific SKU for this size in sizeLabels (from Matrix)
+              let finalSku = colorData.sizeLabels?.[size] || undefined;
+              
+              // If no specific SKU, use variant base SKU with suffix
+              if (!finalSku || finalSku === '') {
+                finalSku = variant.sku ? `${variant.sku.trim()}${skuSuffix}` : undefined;
+              }
+              
+              // If still no SKU, generate one
               if (!finalSku || finalSku === '') {
                 const baseSlug = formData.slug || 'PROD';
                 finalSku = `${baseSlug.toUpperCase()}-${Date.now()}-${colorIndex + 1}-${sizeIndex + 1}`;
@@ -1505,9 +1531,10 @@ function AddProductPageContent() {
         primaryCategoryId: finalPrimaryCategoryId || undefined,
         categoryIds: formData.categoryIds.length > 0 ? formData.categoryIds : undefined,
         published: formData.published,
-      featured: formData.featured,
+        featured: formData.featured,
         locale: 'en',
         variants: variants,
+        attributeIds: undefined,
       };
 
       // Add media if provided
@@ -1592,23 +1619,136 @@ function AddProductPageContent() {
     return null;
   }
 
+
+  // Create new attribute
+  const handleCreateAttribute = async () => {
+    if (!newAttributeName.trim()) {
+      alert('Attribute name is required');
+      return;
+    }
+
+    // Auto-generate key from name (lowercase, replace spaces with hyphens)
+    const autoKey = newAttributeName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+
+    try {
+      setAddingAttribute(true);
+      const response = await apiClient.post<{ data: Attribute }>('/api/v1/admin/attributes', {
+        name: newAttributeName.trim(),
+        key: autoKey,
+        type: 'select',
+        filterable: true,
+        locale: 'en',
+      });
+
+      if (response.data) {
+        setAttributes((prev) => [...prev, response.data]);
+        setNewAttributeName('');
+        setSelectedAttributeId(response.data.id);
+        setAddingAttribute(false);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to create attribute');
+      setAddingAttribute(false);
+    }
+  };
+
+  // Add attribute value
+  const handleAddAttributeValue = async () => {
+    if (!selectedAttributeId || !newAttributeValue.trim()) {
+      alert('Please select an attribute and enter a value');
+      return;
+    }
+
+    try {
+      setAddingAttributeValue(true);
+      const response = await apiClient.post<{ data: Attribute }>(
+        `/api/v1/admin/attributes/${selectedAttributeId}/values`,
+        {
+          label: newAttributeValue.trim(),
+          locale: 'en',
+        }
+      );
+
+      if (response.data) {
+        setAttributes((prev) =>
+          prev.map((attr) => (attr.id === selectedAttributeId ? response.data : attr))
+        );
+        setNewAttributeValue('');
+        setAddingAttributeValue(false);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to add attribute value');
+      setAddingAttributeValue(false);
+    }
+  };
+
+  // Delete attribute
+  const handleDeleteAttribute = async (attributeId: string) => {
+    if (!confirm('Are you sure you want to delete this attribute? This will also delete all its values.')) {
+      return;
+    }
+
+    try {
+      setDeletingAttribute(attributeId);
+      await apiClient.delete(`/api/v1/admin/attributes/${attributeId}`);
+      setAttributes((prev) => prev.filter((attr) => attr.id !== attributeId));
+      if (selectedAttributeId === attributeId) {
+        setSelectedAttributeId(null);
+      }
+      setDeletingAttribute(null);
+    } catch (err: any) {
+      alert(err?.data?.detail || err.message || 'Failed to delete attribute');
+      setDeletingAttribute(null);
+    }
+  };
+
+  // Delete attribute value
+  const handleDeleteAttributeValue = async (valueId: string) => {
+    if (!selectedAttributeId) return;
+
+    if (!confirm('Are you sure you want to delete this value?')) {
+      return;
+    }
+
+    try {
+      setDeletingAttributeValue(valueId);
+      const response = await apiClient.delete<{ data: Attribute }>(
+        `/api/v1/admin/attributes/${selectedAttributeId}/values/${valueId}`
+      );
+
+      if (response.data) {
+        setAttributes((prev) =>
+          prev.map((attr) => (attr.id === selectedAttributeId ? response.data : attr))
+        );
+        setDeletingAttributeValue(null);
+      }
+    } catch (err: any) {
+      alert(err?.data?.detail || err.message || 'Failed to delete attribute value');
+      setDeletingAttributeValue(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <button
-            onClick={() => router.push('/admin')}
-            className="text-gray-600 hover:text-gray-900 mb-4 flex items-center"
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Back to Admin Panel
-          </button>
-          <h1 className="text-3xl font-bold text-gray-900">{isEditMode ? 'Edit Product' : 'Add New Product'}</h1>
-        </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Main Content */}
+        <div>
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <button
+                onClick={() => router.push('/admin')}
+                className="text-gray-600 hover:text-gray-900 flex items-center"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Back to Admin Panel
+              </button>
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900">{isEditMode ? 'Edit Product' : 'Add New Product'}</h1>
+          </div>
 
-        <Card className="p-6">
+          <Card className="p-6">
           <form onSubmit={handleSubmit} className="space-y-14">
             {/* Basic Information */}
             <div>
@@ -1944,633 +2084,890 @@ function AddProductPageContent() {
               )}
             </div>
 
-            {/* Product Variants */}
+            {/* Attributes Section */}
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">Product Variants</h2>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={addVariant}
-                >
-                  + Add Variant
-                </Button>
+                <h2 className="text-xl font-semibold text-gray-900">Attributes</h2>
               </div>
               
-              {formData.variants.length === 0 ? (
-                <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
-                  <p className="text-gray-500 mb-4">No variants added yet</p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={addVariant}
+              <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+                {/* Select/Create Attribute */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium text-gray-700">Select Attribute:</label>
+                  <select
+                    value={selectedAttributeId || ''}
+                    onChange={(e) => setSelectedAttributeId(e.target.value || null)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    Add First Variant
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {formData.variants.map((variant, index) => (
-                    <div key={variant.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-medium text-gray-900">Variant {index + 1}</h3>
+                    <option value="">-- Select Attribute --</option>
+                    {attributes.map((attr) => (
+                      <option key={attr.id} value={attr.id}>
+                        {attr.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Create New Attribute */}
+                  <div className="space-y-2 pt-2 border-t">
+                    <label className="text-sm font-medium text-gray-700">Create New Attribute:</label>
+                    <Input
+                      type="text"
+                      value={newAttributeName}
+                      onChange={(e) => setNewAttributeName(e.target.value)}
+                      placeholder="Attribute Name (e.g., Color, Size, Material)"
+                      className="w-full"
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleCreateAttribute();
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleCreateAttribute}
+                      disabled={addingAttribute || !newAttributeName.trim()}
+                      className="w-full"
+                    >
+                      {addingAttribute ? 'Creating...' : 'Create Attribute'}
+                    </Button>
+                    {newAttributeName.trim() && (
+                      <p className="text-xs text-gray-500">
+                        Key will be auto-generated: <span className="font-mono">{newAttributeName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}</span>
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Add Attribute Value */}
+                  {selectedAttributeId && (
+                    <div className="space-y-2 pt-2 border-t">
+                      <label className="text-sm font-medium text-gray-700">
+                        Add Value to "{attributes.find((a) => a.id === selectedAttributeId)?.name}":
+                      </label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="text"
+                          value={newAttributeValue}
+                          onChange={(e) => setNewAttributeValue(e.target.value)}
+                          placeholder="Value (e.g., Red)"
+                          className="flex-1"
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddAttributeValue();
+                            }
+                          }}
+                        />
                         <Button
                           type="button"
-                          variant="ghost"
-                          onClick={() => removeVariant(variant.id)}
-                          className="text-red-600 hover:text-red-700"
+                          variant="outline"
+                          onClick={handleAddAttributeValue}
+                          disabled={addingAttributeValue || !newAttributeValue.trim()}
                         >
-                          Remove
+                          {addingAttributeValue ? '...' : '+'}
                         </Button>
                       </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                        {/* SKU */}
-                        <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            SKU *
-                          </label>
-                          <div className="flex gap-2">
-                            <Input
-                              type="text"
-                              value={variant.sku}
-                              onChange={(e) => updateVariant(variant.id, 'sku', e.target.value)}
-                              placeholder="Auto-generated if empty"
-                              className="flex-1"
-                              required
-                            />
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => {
-                                // Generate unique SKU based on product title and variant index
-                                const baseSlug = formData.slug || 'PROD';
-                                const variantIndex = formData.variants.findIndex(v => v.id === variant.id);
-                                const generatedSku = `${baseSlug.toUpperCase()}-${Date.now()}-${variantIndex + 1}`;
-                                updateVariant(variant.id, 'sku', generatedSku);
-                              }}
-                              className="whitespace-nowrap"
-                              title="Գեներացնել SKU"
+
+                      {/* Show existing values */}
+                      <div className="space-y-1 max-h-48 overflow-y-auto">
+                        {attributes
+                          .find((a) => a.id === selectedAttributeId)
+                          ?.values.map((val) => (
+                            <div
+                              key={val.id}
+                              className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-md group"
                             >
-                              Գեներացնել
-                            </Button>
-                          </div>
-                          <p className="mt-1 text-xs text-gray-500">SKU-ն պետք է եզակի լինի ամեն վարիանտի համար</p>
-                        </div>
-
-                        {/* Colors - Unified selection with images and stock per color */}
-                        <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-3">
-                            <strong>Colors *</strong>
-                          </label>
-                          
-                          {/* Add new color manually */}
-                          <div className="mb-4 p-4 bg-gray-50 rounded-md border border-gray-200">
-                            <p className="text-sm font-medium text-gray-700 mb-3">
-                              Add New Color (Manual):
-                            </p>
-                            <NewColorSizeInput
-                              variantId={variant.id}
-                              type="color"
-                              onAdd={(name) => addNewColorToVariant(variant.id, name)}
-                              placeholder="Enter color name (e.g. Red, Blue)"
-                            />
-
-                            {/* Quick Selection Palette */}
-                            <div className="mt-4 pt-4 border-t border-gray-200">
-                              <p className="text-xs font-medium text-gray-500 mb-2">Quick Add (Click to add):</p>
-                              <div className="flex flex-wrap gap-2">
-                                {['Black', 'White', 'Red', 'Blue', 'Green', 'Yellow', 'Grey', 'Pink', 'Purple', 'Orange', 'Brown', 'Beige'].map((colorName) => {
-                                  const hex = getColorHex(colorName);
-                                  const isAdded = variant.colors.some(c => c.colorLabel.toLowerCase() === colorName.toLowerCase());
-                                  return (
-                                    <button
-                                      key={colorName}
-                                      type="button"
-                                      onClick={() => addNewColorToVariant(variant.id, colorName)}
-                                      disabled={isAdded}
-                                      className={`flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs transition-all ${
-                                        isAdded 
-                                          ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' 
-                                          : 'bg-white border-gray-300 text-gray-700 hover:border-gray-500 hover:shadow-sm'
-                                      }`}
-                                    >
-                                      <span 
-                                        className="w-3 h-3 rounded-full border border-gray-200"
-                                        style={{ backgroundColor: hex }}
-                                      />
-                                      {colorName}
-                                    </button>
-                                  );
-                                })}
-                              </div>
+                              <span className="text-sm text-gray-700">{val.label}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteAttributeValue(val.id)}
+                                disabled={deletingAttributeValue === val.id}
+                                className="text-red-600 hover:text-red-800 disabled:opacity-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Delete value"
+                              >
+                                {deletingAttributeValue === val.id ? (
+                                  <div className="w-3 h-3 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                                ) : (
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                )}
+                              </button>
                             </div>
-                          </div>
-                          
-                          {/* Color Palette - Checkbox selection */}
-                          <div className="space-y-3 mb-6">
-                            <p className="text-sm font-medium text-gray-700 mb-2">Select Colors (Color Palette):</p>
-                            
-                            {/* Colors from attributes */}
-                            {getColorAttribute() && getColorAttribute()!.values.length > 0 && (
-                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 p-4 border-2 border-gray-300 rounded-lg bg-white max-h-64 overflow-y-auto shadow-sm">
-                                {getColorAttribute()?.values.map((val) => {
-                                  const isSelected = variant.colors.some((c) => c.colorValue === val.value);
-                                  const colorHex = getColorHex(val.label);
-                                  return (
-                                    <label
-                                      key={val.id}
-                                      className={`flex flex-col items-center justify-center cursor-pointer p-3 rounded-lg border-2 transition-all min-h-[100px] ${
-                                        isSelected 
-                                          ? 'bg-blue-50 border-blue-600 shadow-md ring-1 ring-blue-600' 
-                                          : 'bg-white border-gray-300 hover:bg-gray-50 hover:border-gray-400 shadow-sm'
-                                      }`}
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        checked={isSelected}
-                                        onChange={() => toggleVariantColor(variant.id, val.value, val.label)}
-                                        className="sr-only"
-                                      />
-                                      <div className="relative">
-                                        <span
-                                          className="inline-block w-10 h-10 rounded-full border-2 border-gray-300 mb-2 shadow-inner"
-                                          style={{ backgroundColor: colorHex }}
-                                        />
-                                        {isSelected && (
-                                          <div className="absolute -top-1 -right-1 bg-blue-600 text-white rounded-full p-0.5 border border-white">
-                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-                                            </svg>
-                                          </div>
-                                        )}
-                                      </div>
-                                      <span className={`text-sm font-semibold text-center mt-1 truncate w-full ${
-                                        isSelected ? 'text-blue-900' : 'text-gray-800'
-                                      }`}>
-                                        {val.label}
-                                      </span>
-                                    </label>
-                                  );
-                                })}
-                              </div>
-                            )}
-                            
-                            {/* Manually added colors */}
-                            {variant.colors.length > 0 && (() => {
-                              const manuallyAddedColors = variant.colors.filter(colorData => {
-                                const colorAttribute = getColorAttribute();
-                                if (!colorAttribute) return true;
-                                return !colorAttribute.values.some(v => v.value === colorData.colorValue);
-                              });
-                              
-                              if (manuallyAddedColors.length > 0) {
-                                return (
-                                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 p-4 border-2 border-gray-300 rounded-lg bg-white max-h-64 overflow-y-auto shadow-sm">
-                                    {manuallyAddedColors.map((colorData) => {
-                                      const isSelected = variant.colors.some((c) => c.colorValue === colorData.colorValue);
-                                      const colorHex = getColorHex(colorData.colorLabel);
-                                      
-                                      return (
-                                        <label
-                                          key={colorData.colorValue}
-                                          className={`flex flex-col items-center justify-center cursor-pointer p-3 rounded-lg border-2 transition-all min-h-[100px] ${
-                                            isSelected 
-                                              ? 'bg-blue-50 border-blue-600 shadow-md ring-1 ring-blue-600' 
-                                              : 'bg-white border-gray-300 hover:bg-gray-50 hover:border-gray-400 shadow-sm'
-                                          }`}
-                                        >
-                                          <input
-                                            type="checkbox"
-                                            checked={isSelected}
-                                            onChange={() => toggleVariantColor(variant.id, colorData.colorValue, colorData.colorLabel)}
-                                            className="sr-only"
-                                          />
-                                          <div className="relative">
-                                            <span
-                                              className="inline-block w-10 h-10 rounded-full border-2 border-gray-300 mb-2 shadow-inner"
-                                              style={{ backgroundColor: colorHex }}
-                                            />
-                                            {isSelected && (
-                                              <div className="absolute -top-1 -right-1 bg-blue-600 text-white rounded-full p-0.5 border border-white">
-                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-                                                </svg>
-                                              </div>
-                                            )}
-                                          </div>
-                                          <span className={`text-sm font-semibold text-center mt-1 truncate w-full ${
-                                            isSelected ? 'text-blue-900' : 'text-gray-800'
-                                          }`}>
-                                            {colorData.colorLabel}
-                                          </span>
-                                        </label>
-                                      );
-                                    })}
-                                  </div>
-                                );
-                              }
-                              return null;
-                            })()}
-                            
-                            {/* Show message if no colors available */}
-                            {(!getColorAttribute() || getColorAttribute()!.values.length === 0) && 
-                             variant.colors.length === 0 && (
-                              <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 text-center text-gray-500 text-sm">
-                                No colors available. Add a new color above.
-                              </div>
-                            )}
-                          </div>
-                          
-                          {/* Selected Colors with Images and Stock */}
-                          {variant.colors.length > 0 && (
-                            <div className="space-y-4 mt-6">
-                              <p className="text-sm font-semibold text-gray-900 mb-3">
-                                Configure each color (Images, Stock, Price, Sizes):
-                              </p>
-                              
-                              {variant.colors.map((colorData, colorIndex) => {
-                                const colorHex = getColorHex(colorData.colorLabel);
-                                
-                                return (
-                                  <div key={colorData.colorValue} className="border-2 border-gray-300 rounded-lg p-4 bg-white">
-                                    <div className="flex items-center justify-between mb-4">
-                                      <div className="flex items-center gap-3">
-                                        <div className="flex items-center gap-2 mr-2">
-                                          <input
-                                            type="checkbox"
-                                            id={`featured-${colorData.colorValue}`}
-                                            checked={!!colorData.isFeatured}
-                                            onChange={() => setFeaturedColor(variant.id, colorData.colorValue)}
-                                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                                          />
-                                          <label 
-                                            htmlFor={`featured-${colorData.colorValue}`}
-                                            className="text-xs text-gray-500 cursor-pointer hover:text-blue-600 transition-colors"
-                                          >
-                                            Main
-                                          </label>
-                                        </div>
-                                        <span
-                                          className="inline-block w-6 h-6 rounded-full border-2 border-gray-300 shadow-sm"
-                                          style={{ backgroundColor: colorHex }}
-                                        />
-                                        <h4 className="text-base font-semibold text-gray-900">
-                                          {colorData.colorLabel}
-                                        </h4>
-                                      </div>
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => toggleVariantColor(variant.id, colorData.colorValue, colorData.colorLabel)}
-                                        className="text-red-600 hover:text-red-700 text-xs"
-                                      >
-                                        Remove
-                                      </Button>
-                                    </div>
-                                    
-                                    <div className="space-y-4">
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {/* Images for this color */}
-                                        <div>
-                                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Images for {colorData.colorLabel} *
-                                          </label>
-                                          
-                                          {/* Image Upload */}
-                                          <div className="mb-3">
-                                            <Button
-                                              type="button"
-                                              variant="outline"
-                                              size="sm"
-                                              onClick={() => {
-                                                setColorImageTarget({ variantId: variant.id, colorValue: colorData.colorValue });
-                                                colorImageFileInputRef.current?.click();
-                                              }}
-                                              disabled={imageUploadLoading}
-                                              className="w-full text-xs"
-                                            >
-                                              {imageUploadLoading && colorImageTarget?.colorValue === colorData.colorValue
-                                                ? 'Uploading...'
-                                                : '+ Upload Images'}
-                                            </Button>
-                                          </div>
-                                          
-                                          {/* Display uploaded images */}
-                                          {colorData.images.length > 0 && (
-                                            <div className="grid grid-cols-3 gap-2 mt-3">
-                                              {colorData.images.map((imageUrl, imgIndex) => (
-                                                <div key={imgIndex} className="relative group">
-                                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                  <img
-                                                    src={processImageUrl(imageUrl)}
-                                                    alt={`${colorData.colorLabel} ${imgIndex + 1}`}
-                                                    className="w-full h-20 object-cover rounded border border-gray-300"
-                                                    onError={(e) => {
-                                                      const target = e.target as HTMLImageElement;
-                                                      target.style.display = 'none';
-                                                      // Show a placeholder or error label if needed
-                                                      const parent = target.parentElement;
-                                                      if (parent) {
-                                                        const errorDiv = document.createElement('div');
-                                                        errorDiv.className = 'w-full h-full flex items-center justify-center bg-gray-100 text-[10px] text-red-500 text-center p-1';
-                                                        errorDiv.innerText = 'Broken Image';
-                                                        parent.appendChild(errorDiv);
-                                                      }
-                                                    }}
-                                                  />
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => removeColorImage(variant.id, colorData.colorValue, imgIndex)}
-                                                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                                                    title="Remove image"
-                                                  >
-                                                    ×
-                                                  </button>
-                                                </div>
-                                              ))}
-                                            </div>
-                                          )}
-                                          
-                                          {colorData.images.length === 0 && (
-                                            <p className="text-xs text-gray-500 mt-2">
-                                              No images uploaded yet. Click "Upload Images" to add.
-                                            </p>
-                                          )}
-                                        </div>
-                                        
-                                        {/* Stock for this color (if no sizes) */}
-                                        {(!isClothingCategory() || (colorData.sizes || []).length === 0) && (
-                                          <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                              Stock for {colorData.colorLabel} *
-                                            </label>
-                                            <Input
-                                              type="number"
-                                              value={colorData.stock}
-                                              onChange={(e) => updateColorStock(variant.id, colorData.colorValue, e.target.value)}
-                                              placeholder="0"
-                                              required
-                                              className="w-full"
-                                              min="0"
-                                            />
-                                          </div>
-                                        )}
-                                        
-                                        {/* Price and Discount for this color */}
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                          <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                              Price for {colorData.colorLabel} *
-                                            </label>
-                                            <Input
-                                              type="number"
-                                              value={colorData.price || ''}
-                                              onChange={(e) => updateColorPrice(variant.id, colorData.colorValue, e.target.value)}
-                                              placeholder="0.00"
-                                              className="w-full"
-                                              required
-                                              min="0"
-                                              step="0.01"
-                                            />
-                                          </div>
-                                          <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                              Compare at price (Discount)
-                                            </label>
-                                            <Input
-                                              type="number"
-                                              value={colorData.compareAtPrice || ''}
-                                              onChange={(e) => updateColorCompareAtPrice(variant.id, colorData.colorValue, e.target.value)}
-                                              placeholder="0.00"
-                                              className="w-full"
-                                              min="0"
-                                              step="0.01"
-                                            />
-                                            <p className="text-[10px] text-gray-500 mt-1">
-                                              Show a strike-through price (original price)
-                                            </p>
-                                          </div>
-                                        </div>
-                                      </div>
-                                      
-                                      {/* Sizes for this color - only if category requires sizes */}
-                                      {isClothingCategory() && (
-                                        <div className="mt-4 pt-4 border-t border-gray-200">
-                                          <label className="block text-sm font-medium text-gray-700 mb-3">
-                                            <strong>Sizes for {colorData.colorLabel} {isClothingCategory() ? '*' : ''}</strong>
-                                          </label>
-                                          
-                                          {/* Add new size section */}
-                                          <div className="mb-4 p-3 bg-gray-50 rounded-md border border-gray-200">
-                                            <p className="text-sm font-medium text-gray-700 mb-2">
-                                              Add New Size:
-                                            </p>
-                                            <NewColorSizeInput
-                                              variantId={variant.id}
-                                              type="size"
-                                              onAdd={(name) => addNewSizeToColor(variant.id, colorData.colorValue, name)}
-                                              placeholder="Enter size name (e.g. S, M, L, XL)"
-                                            />
-                                          </div>
-                                          
-                                          {/* Checkbox list for selecting sizes */}
-                                          <div className="space-y-3 mb-4">
-                                            <p className="text-sm font-medium text-gray-700 mb-2">Select Sizes (checkboxes):</p>
-                                            
-                                            {/* Sizes from attributes */}
-                                            {getSizeAttribute() && getSizeAttribute()!.values.length > 0 && (
-                                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 border-2 border-gray-300 rounded-lg bg-white max-h-64 overflow-y-auto shadow-sm">
-                                                {getSizeAttribute()?.values.map((val) => {
-                                                  const isSelected = (colorData.sizes || []).includes(val.value);
-                                                  return (
-                                                    <label
-                                                      key={val.id}
-                                                      className={`flex items-center space-x-3 cursor-pointer p-3 rounded-lg border-2 transition-all ${
-                                                        isSelected 
-                                                          ? 'bg-gray-100 border-gray-500 shadow-sm' 
-                                                          : 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                                                      }`}
-                                                    >
-                                                      <input
-                                                        type="checkbox"
-                                                        checked={isSelected}
-                                                        onChange={() => toggleColorSize(variant.id, colorData.colorValue, val.value)}
-                                                        className="w-5 h-5 text-gray-600 border-gray-300 rounded focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 cursor-pointer"
-                                                      />
-                                                      <span className={`text-sm font-medium ${
-                                                        isSelected ? 'text-gray-900' : 'text-gray-700'
-                                                      }`}>
-                                                        {val.label}
-                                                      </span>
-                                                    </label>
-                                                  );
-                                                })}
-                                              </div>
-                                            )}
-                                            
-                                            {/* Manually added sizes */}
-                                            {(colorData.sizes || []).length > 0 && (() => {
-                                              const manuallyAddedSizes = (colorData.sizes || []).filter(sizeValue => {
-                                                const sizeAttribute = getSizeAttribute();
-                                                if (!sizeAttribute) return true;
-                                                return !sizeAttribute.values.some(v => v.value === sizeValue);
-                                              });
-                                              
-                                              if (manuallyAddedSizes.length > 0) {
-                                                return (
-                                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 border-2 border-gray-300 rounded-lg bg-white max-h-64 overflow-y-auto shadow-sm">
-                                                    {manuallyAddedSizes.map((sizeValue) => {
-                                                      const isSelected = (colorData.sizes || []).includes(sizeValue);
-                                                      const savedLabel = colorData.sizeLabels?.[sizeValue];
-                                                      const sizeLabel = savedLabel || 
-                                                        sizeValue.toUpperCase().replace(/-/g, ' ');
-                                                      
-                                                      return (
-                                                        <label
-                                                          key={sizeValue}
-                                                          className={`flex items-center space-x-3 cursor-pointer p-3 rounded-lg border-2 transition-all ${
-                                                            isSelected 
-                                                              ? 'bg-gray-100 border-gray-500 shadow-sm' 
-                                                              : 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                                                          }`}
-                                                        >
-                                                          <input
-                                                            type="checkbox"
-                                                            checked={isSelected}
-                                                            onChange={() => toggleColorSize(variant.id, colorData.colorValue, sizeValue)}
-                                                            className="w-5 h-5 text-gray-600 border-gray-300 rounded focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 cursor-pointer"
-                                                          />
-                                                          <span className={`text-sm font-medium ${
-                                                            isSelected ? 'text-gray-900' : 'text-gray-700'
-                                                          }`}>
-                                                            {sizeLabel}
-                                                          </span>
-                                                        </label>
-                                                      );
-                                                    })}
-                                                  </div>
-                                                );
-                                              }
-                                              return null;
-                                            })()}
-                                            
-                                            {/* Show message if no sizes available */}
-                                            {(!getSizeAttribute() || getSizeAttribute()!.values.length === 0) && 
-                                             (colorData.sizes || []).length === 0 && (
-                                              <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 text-center text-gray-500 text-sm">
-                                                {isClothingCategory() 
-                                                  ? 'No sizes available. Add a new size above.' 
-                                                  : 'No sizes available.'}
-                                              </div>
-                                            )}
-                                          </div>
-                                          
-                                          {/* Stock inputs for each selected size */}
-                                          {(colorData.sizes || []).length > 0 && (
-                                            <div className="mt-4 space-y-3 p-4 bg-gray-50 rounded-md border border-gray-200">
-                                              <p className="text-sm font-medium text-gray-700 mb-3">
-                                                Stock for each size:
-                                              </p>
-                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                {(colorData.sizes || []).map((sizeValue) => {
-                                                  const sizeFromAttribute = getSizeAttribute()?.values.find(
-                                                    (v) => v.value === sizeValue
-                                                  );
-                                                  const savedLabel = colorData.sizeLabels?.[sizeValue];
-                                                  const sizeLabel = sizeFromAttribute?.label || 
-                                                    savedLabel || 
-                                                    sizeValue.toUpperCase().replace(/-/g, ' ');
-                                                  const stockValue = (colorData.sizeStocks || {})[sizeValue] !== undefined && (colorData.sizeStocks || {})[sizeValue] !== null
-                                                    ? String((colorData.sizeStocks || {})[sizeValue])
-                                                    : '';
-                                                  
-                                                  return (
-                                                    <div key={sizeValue} className="flex items-center gap-2">
-                                                      <label className="text-sm text-gray-700 min-w-[80px] font-medium">
-                                                        {sizeLabel}:
-                                                      </label>
-                                                      <Input
-                                                        type="number"
-                                                        value={stockValue}
-                                                        onChange={(e) => updateColorSizeStock(variant.id, colorData.colorValue, sizeValue, e.target.value)}
-                                                        placeholder="0"
-                                                        required
-                                                        className="flex-1"
-                                                        min="0"
-                                                      />
-                                                    </div>
-                                                  );
-                                                })}
-                                              </div>
-                                            </div>
-                                          )}
-                                          
-                                          {/* Validation message */}
-                                          {isClothingCategory() && 
-                                           (colorData.sizes || []).length === 0 && (
-                                            <p className="mt-2 text-sm text-red-600">
-                                              At least one size is required for this category
-                                            </p>
-                                          )}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                          
-                          {/* Option to add to global attributes */}
-                          {getColorAttribute() && (
-                            <div className="mt-4 p-3 bg-gray-50 rounded-md border border-gray-200">
-                              <p className="text-xs text-gray-600 mb-2">
-                                Or add color to global attributes (for all products):
-                              </p>
-                              <div className="flex items-center gap-2">
-                                <Input
-                                  type="text"
-                                  value={newColorName}
-                                  onChange={(e) => setNewColorName(e.target.value)}
-                                  placeholder="Enter color name"
-                                  className="flex-1"
-                                  onKeyPress={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.preventDefault();
-                                      handleAddColor();
-                                    }
-                                  }}
-                                />
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={handleAddColor}
-                                  disabled={addingColor || !newColorName.trim()}
-                                  className="whitespace-nowrap text-xs"
-                                >
-                                  {addingColor ? 'Adding...' : '+ Add to Attributes'}
-                                </Button>
-                              </div>
-                              {colorMessage && (
-                                <div className={`mt-2 text-xs px-2 py-1 rounded ${
-                                  colorMessage.type === 'success' 
-                                    ? 'bg-green-50 text-green-700 border border-green-200' 
-                                    : 'bg-red-50 text-red-700 border border-red-200'
-                                }`}>
-                                  {colorMessage.text}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
+                          ))}
                       </div>
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
+              </div>
+            </div>
+
+            {/* Matrix Variant Builder */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">Variant Builder</h2>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={useMatrixBuilder}
+                      onChange={(e) => {
+                        setUseMatrixBuilder(e.target.checked);
+                        if (!e.target.checked) {
+                          // Clear matrix data when disabling
+                          setMatrixSelectedColors([]);
+                          setMatrixSelectedSizes([]);
+                          setMatrixVariants({});
+                        }
+                      }}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700">Use Matrix Builder (Recommended)</span>
+                  </label>
+                </div>
+              </div>
+
+              {useMatrixBuilder ? (
+                <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-6">
+                  {/* Select Colors and Sizes */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Colors Selection */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Select Colors (Optional)
+                      </label>
+                      {getColorAttribute() && getColorAttribute()!.values.length > 0 ? (
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 p-4 border-2 border-gray-300 rounded-lg bg-white max-h-64 overflow-y-auto">
+                          {getColorAttribute()?.values.map((val) => {
+                            const isSelected = matrixSelectedColors.includes(val.value);
+                            const colorHex = getColorHex(val.label);
+                            return (
+                              <label
+                                key={val.id}
+                                className={`flex flex-col items-center justify-center cursor-pointer p-2 rounded-lg border-2 transition-all ${
+                                  isSelected 
+                                    ? 'bg-blue-50 border-blue-600 shadow-md' 
+                                    : 'bg-white border-gray-300 hover:bg-gray-50'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setMatrixSelectedColors([...matrixSelectedColors, val.value]);
+                                    } else {
+                                      setMatrixSelectedColors(matrixSelectedColors.filter(c => c !== val.value));
+                                      // Remove variants for this color
+                                      const newMatrixVariants = { ...matrixVariants };
+                                      matrixSelectedSizes.forEach(size => {
+                                        delete newMatrixVariants[`${val.value}-${size}`];
+                                      });
+                                      setMatrixVariants(newMatrixVariants);
+                                    }
+                                  }}
+                                  className="sr-only"
+                                />
+                                <span
+                                  className="inline-block w-8 h-8 rounded-full border-2 border-gray-300 mb-1 shadow-inner"
+                                  style={{ backgroundColor: colorHex }}
+                                />
+                                <span className={`text-xs font-medium text-center truncate w-full ${
+                                  isSelected ? 'text-blue-900' : 'text-gray-800'
+                                }`}>
+                                  {val.label}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 text-center text-gray-500 text-sm">
+                          No colors available. Add colors in Attributes section above.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Sizes Selection */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Select Sizes {isClothingCategory() ? '*' : '(Optional)'}
+                      </label>
+                      {getSizeAttribute() && getSizeAttribute()!.values.length > 0 ? (
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 p-4 border-2 border-gray-300 rounded-lg bg-white max-h-64 overflow-y-auto">
+                          {getSizeAttribute()?.values.map((val) => {
+                            const isSelected = matrixSelectedSizes.includes(val.value);
+                            return (
+                              <label
+                                key={val.id}
+                                className={`flex items-center justify-center cursor-pointer p-3 rounded-lg border-2 transition-all ${
+                                  isSelected 
+                                    ? 'bg-blue-50 border-blue-600 shadow-md' 
+                                    : 'bg-white border-gray-300 hover:bg-gray-50'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setMatrixSelectedSizes([...matrixSelectedSizes, val.value]);
+                                    } else {
+                                      setMatrixSelectedSizes(matrixSelectedSizes.filter(s => s !== val.value));
+                                      // Remove variants for this size
+                                      const newMatrixVariants = { ...matrixVariants };
+                                      matrixSelectedColors.forEach(color => {
+                                        delete newMatrixVariants[`${color}-${val.value}`];
+                                      });
+                                      setMatrixVariants(newMatrixVariants);
+                                    }
+                                  }}
+                                  className="sr-only"
+                                />
+                                <span className={`text-sm font-semibold ${
+                                  isSelected ? 'text-blue-900' : 'text-gray-800'
+                                }`}>
+                                  {val.label}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 text-center text-gray-500 text-sm">
+                          {isClothingCategory() 
+                            ? 'No sizes available. Add sizes in Attributes section above.' 
+                            : 'No sizes available. Sizes are optional for this category.'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Matrix Table */}
+                  {((matrixSelectedColors.length > 0 || matrixSelectedSizes.length > 0) || (!isClothingCategory() && matrixSelectedColors.length === 0 && matrixSelectedSizes.length === 0)) ? (
+                    <div className="mt-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          Variant Matrix {
+                            matrixSelectedColors.length > 0 && matrixSelectedSizes.length > 0
+                              ? `(${matrixSelectedColors.length} colors × ${matrixSelectedSizes.length} sizes)`
+                              : matrixSelectedColors.length > 0
+                              ? `(${matrixSelectedColors.length} colors)`
+                              : matrixSelectedSizes.length > 0
+                              ? `(${matrixSelectedSizes.length} sizes)`
+                              : '(Single variant)'
+                          }
+                        </h3>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            // Bulk fill all variants with same values
+                            const defaultPrice = prompt('Enter default price for all variants:') || '';
+                            const defaultStock = prompt('Enter default stock for all variants:') || '';
+                            const defaultSku = prompt('Enter SKU prefix (will add -color-size if applicable):') || '';
+                            
+                            if (defaultPrice || defaultStock || defaultSku) {
+                              const newMatrixVariants = { ...matrixVariants };
+                              
+                              if (matrixSelectedColors.length > 0) {
+                                matrixSelectedColors.forEach((colorValue) => {
+                                  if (matrixSelectedSizes.length > 0) {
+                                    matrixSelectedSizes.forEach((sizeValue) => {
+                                      const key = `${colorValue}-${sizeValue}`;
+                                      newMatrixVariants[key] = {
+                                        price: defaultPrice || newMatrixVariants[key]?.price || '',
+                                        compareAtPrice: newMatrixVariants[key]?.compareAtPrice || '',
+                                        stock: defaultStock || newMatrixVariants[key]?.stock || '',
+                                        sku: defaultSku ? `${defaultSku}-${colorValue}-${sizeValue}` : (newMatrixVariants[key]?.sku || ''),
+                                      };
+                                    });
+                                  } else {
+                                    const key = colorValue;
+                                    newMatrixVariants[key] = {
+                                      price: defaultPrice || newMatrixVariants[key]?.price || '',
+                                      compareAtPrice: newMatrixVariants[key]?.compareAtPrice || '',
+                                      stock: defaultStock || newMatrixVariants[key]?.stock || '',
+                                      sku: defaultSku ? `${defaultSku}-${colorValue}` : (newMatrixVariants[key]?.sku || ''),
+                                    };
+                                  }
+                                });
+                              } else if (matrixSelectedSizes.length > 0) {
+                                // Only sizes, no colors
+                                matrixSelectedSizes.forEach((sizeValue) => {
+                                  const key = sizeValue;
+                                  newMatrixVariants[key] = {
+                                    price: defaultPrice || newMatrixVariants[key]?.price || '',
+                                    compareAtPrice: newMatrixVariants[key]?.compareAtPrice || '',
+                                    stock: defaultStock || newMatrixVariants[key]?.stock || '',
+                                    sku: defaultSku ? `${defaultSku}-${sizeValue}` : (newMatrixVariants[key]?.sku || ''),
+                                  };
+                                });
+                              } else {
+                                // Single variant
+                                newMatrixVariants['single'] = {
+                                  price: defaultPrice || newMatrixVariants['single']?.price || '',
+                                  compareAtPrice: newMatrixVariants['single']?.compareAtPrice || '',
+                                  stock: defaultStock || newMatrixVariants['single']?.stock || '',
+                                  sku: defaultSku || (newMatrixVariants['single']?.sku || ''),
+                                };
+                              }
+                              setMatrixVariants(newMatrixVariants);
+                            }
+                          }}
+                        >
+                          Bulk Fill
+                        </Button>
+                      </div>
+
+                      <div className="overflow-x-auto border border-gray-300 rounded-lg">
+                        <table className="min-w-full divide-y divide-gray-200 bg-white">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10 border-r">
+                                {matrixSelectedColors.length > 0 ? 'Color / Size' : matrixSelectedSizes.length > 0 ? 'Size' : 'Variant'}
+                              </th>
+                              {matrixSelectedSizes.length > 0 ? (
+                                matrixSelectedSizes.map((sizeValue) => {
+                                  const sizeLabel = getSizeAttribute()?.values.find(v => v.value === sizeValue)?.label || sizeValue;
+                                  return (
+                                    <th key={sizeValue} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r last:border-r-0">
+                                      {sizeLabel}
+                                    </th>
+                                  );
+                                })
+                              ) : (
+                                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  Variant
+                                </th>
+                              )}
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {matrixSelectedColors.length > 0 ? (
+                              matrixSelectedColors.map((colorValue) => {
+                              const colorLabel = getColorAttribute()?.values.find(v => v.value === colorValue)?.label || colorValue;
+                              const colorHex = getColorHex(colorLabel);
+                              
+                              return (
+                                <tr key={colorValue} className="hover:bg-gray-50">
+                                  <td className="px-4 py-3 sticky left-0 bg-white z-10 border-r">
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className="inline-block w-6 h-6 rounded-full border-2 border-gray-300 shadow-sm"
+                                        style={{ backgroundColor: colorHex }}
+                                      />
+                                      <span className="text-sm font-medium text-gray-900">{colorLabel}</span>
+                                    </div>
+                                  </td>
+                                  {matrixSelectedSizes.length > 0 ? (
+                                    matrixSelectedSizes.map((sizeValue) => {
+                                      const sizeLabel = getSizeAttribute()?.values.find(v => v.value === sizeValue)?.label || sizeValue;
+                                      const key = `${colorValue}-${sizeValue}`;
+                                      const variant = matrixVariants[key] || { price: '', compareAtPrice: '', stock: '', sku: '' };
+                                      
+                                      return (
+                                        <td key={sizeValue} className="px-4 py-3 border-r last:border-r-0">
+                                          <div className="space-y-2 min-w-[200px]">
+                                            <div>
+                                              <label className="block text-xs text-gray-500 mb-1">Price *</label>
+                                              <Input
+                                                type="number"
+                                                value={variant.price}
+                                                onChange={(e) => {
+                                                  setMatrixVariants({
+                                                    ...matrixVariants,
+                                                    [key]: { ...variant, price: e.target.value }
+                                                  });
+                                                }}
+                                                placeholder="0.00"
+                                                className="w-full text-sm"
+                                                min="0"
+                                                step="0.01"
+                                                required
+                                              />
+                                            </div>
+                                            <div>
+                                              <label className="block text-xs text-gray-500 mb-1">Compare At Price</label>
+                                              <Input
+                                                type="number"
+                                                value={variant.compareAtPrice}
+                                                onChange={(e) => {
+                                                  setMatrixVariants({
+                                                    ...matrixVariants,
+                                                    [key]: { ...variant, compareAtPrice: e.target.value }
+                                                  });
+                                                }}
+                                                placeholder="0.00"
+                                                className="w-full text-sm"
+                                                min="0"
+                                                step="0.01"
+                                              />
+                                            </div>
+                                            <div>
+                                              <label className="block text-xs text-gray-500 mb-1">Stock *</label>
+                                              <Input
+                                                type="number"
+                                                value={variant.stock}
+                                                onChange={(e) => {
+                                                  setMatrixVariants({
+                                                    ...matrixVariants,
+                                                    [key]: { ...variant, stock: e.target.value }
+                                                  });
+                                                }}
+                                                placeholder="0"
+                                                className="w-full text-sm"
+                                                min="0"
+                                                required
+                                              />
+                                            </div>
+                                            <div>
+                                              <label className="block text-xs text-gray-500 mb-1">SKU</label>
+                                              <Input
+                                                type="text"
+                                                value={variant.sku}
+                                                onChange={(e) => {
+                                                  setMatrixVariants({
+                                                    ...matrixVariants,
+                                                    [key]: { ...variant, sku: e.target.value }
+                                                  });
+                                                }}
+                                                placeholder="Auto-generated"
+                                                className="w-full text-sm"
+                                              />
+                                            </div>
+                                          </div>
+                                        </td>
+                                      );
+                                    })
+                                  ) : (
+                                    <td className="px-4 py-3">
+                                      <div className="space-y-2 min-w-[200px]">
+                                        <div>
+                                          <label className="block text-xs text-gray-500 mb-1">Price *</label>
+                                          <Input
+                                            type="number"
+                                            value={matrixVariants[colorValue]?.price || ''}
+                                            onChange={(e) => {
+                                              setMatrixVariants({
+                                                ...matrixVariants,
+                                                [colorValue]: { 
+                                                  ...(matrixVariants[colorValue] || { compareAtPrice: '', stock: '', sku: '' }), 
+                                                  price: e.target.value 
+                                                }
+                                              });
+                                            }}
+                                            placeholder="0.00"
+                                            className="w-full text-sm"
+                                            min="0"
+                                            step="0.01"
+                                            required
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs text-gray-500 mb-1">Compare At Price</label>
+                                          <Input
+                                            type="number"
+                                            value={matrixVariants[colorValue]?.compareAtPrice || ''}
+                                            onChange={(e) => {
+                                              setMatrixVariants({
+                                                ...matrixVariants,
+                                                [colorValue]: { 
+                                                  ...(matrixVariants[colorValue] || { price: '', stock: '', sku: '' }), 
+                                                  compareAtPrice: e.target.value 
+                                                }
+                                              });
+                                            }}
+                                            placeholder="0.00"
+                                            className="w-full text-sm"
+                                            min="0"
+                                            step="0.01"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs text-gray-500 mb-1">Stock *</label>
+                                          <Input
+                                            type="number"
+                                            value={matrixVariants[colorValue]?.stock || ''}
+                                            onChange={(e) => {
+                                              setMatrixVariants({
+                                                ...matrixVariants,
+                                                [colorValue]: { 
+                                                  ...(matrixVariants[colorValue] || { price: '', compareAtPrice: '', sku: '' }), 
+                                                  stock: e.target.value 
+                                                }
+                                              });
+                                            }}
+                                            placeholder="0"
+                                            className="w-full text-sm"
+                                            min="0"
+                                            required
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs text-gray-500 mb-1">SKU</label>
+                                          <Input
+                                            type="text"
+                                            value={matrixVariants[colorValue]?.sku || ''}
+                                            onChange={(e) => {
+                                              setMatrixVariants({
+                                                ...matrixVariants,
+                                                [colorValue]: { 
+                                                  ...(matrixVariants[colorValue] || { price: '', compareAtPrice: '', stock: '' }), 
+                                                  sku: e.target.value 
+                                                }
+                                              });
+                                            }}
+                                            placeholder="Auto-generated"
+                                            className="w-full text-sm"
+                                          />
+                                        </div>
+                                      </div>
+                                    </td>
+                                  )}
+                                </tr>
+                              );
+                            })
+                            ) : matrixSelectedSizes.length > 0 ? (
+                              // Only sizes, no colors
+                              <tr className="hover:bg-gray-50">
+                                <td className="px-4 py-3 sticky left-0 bg-white z-10 border-r">
+                                  <span className="text-sm font-medium text-gray-900">Sizes</span>
+                                </td>
+                                {matrixSelectedSizes.map((sizeValue) => {
+                                  const sizeLabel = getSizeAttribute()?.values.find(v => v.value === sizeValue)?.label || sizeValue;
+                                  const key = sizeValue;
+                                  const variant = matrixVariants[key] || { price: '', compareAtPrice: '', stock: '', sku: '' };
+                                  
+                                  return (
+                                    <td key={sizeValue} className="px-4 py-3 border-r last:border-r-0">
+                                      <div className="space-y-2 min-w-[200px]">
+                                        <div>
+                                          <label className="block text-xs text-gray-500 mb-1">Price *</label>
+                                          <Input
+                                            type="number"
+                                            value={variant.price}
+                                            onChange={(e) => {
+                                              setMatrixVariants({
+                                                ...matrixVariants,
+                                                [key]: { ...variant, price: e.target.value }
+                                              });
+                                            }}
+                                            placeholder="0.00"
+                                            className="w-full text-sm"
+                                            min="0"
+                                            step="0.01"
+                                            required
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs text-gray-500 mb-1">Compare At Price</label>
+                                          <Input
+                                            type="number"
+                                            value={variant.compareAtPrice}
+                                            onChange={(e) => {
+                                              setMatrixVariants({
+                                                ...matrixVariants,
+                                                [key]: { ...variant, compareAtPrice: e.target.value }
+                                              });
+                                            }}
+                                            placeholder="0.00"
+                                            className="w-full text-sm"
+                                            min="0"
+                                            step="0.01"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs text-gray-500 mb-1">Stock *</label>
+                                          <Input
+                                            type="number"
+                                            value={variant.stock}
+                                            onChange={(e) => {
+                                              setMatrixVariants({
+                                                ...matrixVariants,
+                                                [key]: { ...variant, stock: e.target.value }
+                                              });
+                                            }}
+                                            placeholder="0"
+                                            className="w-full text-sm"
+                                            min="0"
+                                            required
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs text-gray-500 mb-1">SKU</label>
+                                          <Input
+                                            type="text"
+                                            value={variant.sku}
+                                            onChange={(e) => {
+                                              setMatrixVariants({
+                                                ...matrixVariants,
+                                                [key]: { ...variant, sku: e.target.value }
+                                              });
+                                            }}
+                                            placeholder="Auto-generated"
+                                            className="w-full text-sm"
+                                          />
+                                        </div>
+                                      </div>
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ) : (
+                              // No colors, no sizes - single variant
+                              <tr className="hover:bg-gray-50">
+                                <td className="px-4 py-3 sticky left-0 bg-white z-10 border-r">
+                                  <span className="text-sm font-medium text-gray-900">Single Variant</span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="space-y-2 min-w-[200px]">
+                                    <div>
+                                      <label className="block text-xs text-gray-500 mb-1">Price *</label>
+                                      <Input
+                                        type="number"
+                                        value={matrixVariants['single']?.price || ''}
+                                        onChange={(e) => {
+                                          setMatrixVariants({
+                                            ...matrixVariants,
+                                            'single': { 
+                                              ...(matrixVariants['single'] || { compareAtPrice: '', stock: '', sku: '' }), 
+                                              price: e.target.value 
+                                            }
+                                          });
+                                        }}
+                                        placeholder="0.00"
+                                        className="w-full text-sm"
+                                        min="0"
+                                        step="0.01"
+                                        required
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs text-gray-500 mb-1">Compare At Price</label>
+                                      <Input
+                                        type="number"
+                                        value={matrixVariants['single']?.compareAtPrice || ''}
+                                        onChange={(e) => {
+                                          setMatrixVariants({
+                                            ...matrixVariants,
+                                            'single': { 
+                                              ...(matrixVariants['single'] || { price: '', stock: '', sku: '' }), 
+                                              compareAtPrice: e.target.value 
+                                            }
+                                          });
+                                        }}
+                                        placeholder="0.00"
+                                        className="w-full text-sm"
+                                        min="0"
+                                        step="0.01"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs text-gray-500 mb-1">Stock *</label>
+                                      <Input
+                                        type="number"
+                                        value={matrixVariants['single']?.stock || ''}
+                                        onChange={(e) => {
+                                          setMatrixVariants({
+                                            ...matrixVariants,
+                                            'single': { 
+                                              ...(matrixVariants['single'] || { price: '', compareAtPrice: '', sku: '' }), 
+                                              stock: e.target.value 
+                                            }
+                                          });
+                                        }}
+                                        placeholder="0"
+                                        className="w-full text-sm"
+                                        min="0"
+                                        required
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs text-gray-500 mb-1">SKU</label>
+                                      <Input
+                                        type="text"
+                                        value={matrixVariants['single']?.sku || ''}
+                                        onChange={(e) => {
+                                          setMatrixVariants({
+                                            ...matrixVariants,
+                                            'single': { 
+                                              ...(matrixVariants['single'] || { price: '', compareAtPrice: '', stock: '' }), 
+                                              sku: e.target.value 
+                                            }
+                                          });
+                                        }}
+                                        placeholder="Auto-generated"
+                                        className="w-full text-sm"
+                                      />
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="mt-4 flex justify-end">
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            // Convert matrix variants to formData.variants structure
+                            // Create variants from matrix
+                            const newVariants: Variant[] = [];
+                            
+                            if (matrixSelectedColors.length > 0) {
+                              // Group by color (one variant per color with all its sizes)
+                              matrixSelectedColors.forEach((colorValue) => {
+                              const colorLabel = getColorAttribute()?.values.find(v => v.value === colorValue)?.label || colorValue;
+                              
+                              const variant: Variant = {
+                                id: `variant-${Date.now()}-${colorValue}`,
+                                price: '', // Will be set per color
+                                compareAtPrice: '',
+                                sku: '',
+                                colors: [{
+                                  colorValue,
+                                  colorLabel,
+                                  images: [],
+                                  stock: matrixSelectedSizes.length === 0 ? (matrixVariants[colorValue]?.stock || '') : '',
+                                  price: matrixSelectedSizes.length === 0 ? (matrixVariants[colorValue]?.price || '') : undefined,
+                                  compareAtPrice: matrixSelectedSizes.length === 0 ? (matrixVariants[colorValue]?.compareAtPrice || '') : undefined,
+                                  sizes: matrixSelectedSizes,
+                                  sizeStocks: {},
+                                  sizeLabels: {},
+                                }],
+                              };
+
+                              // If sizes exist, add size stocks, prices, and SKUs
+                              if (matrixSelectedSizes.length > 0) {
+                                // Use first size's price as base price (or average if needed)
+                                const firstSizeKey = `${colorValue}-${matrixSelectedSizes[0]}`;
+                                const firstSizeVariant = matrixVariants[firstSizeKey];
+                                if (firstSizeVariant) {
+                                  variant.colors[0].price = firstSizeVariant.price;
+                                  variant.colors[0].compareAtPrice = firstSizeVariant.compareAtPrice;
+                                  variant.sku = firstSizeVariant.sku || '';
+                                }
+                                
+                                matrixSelectedSizes.forEach((sizeValue) => {
+                                  const key = `${colorValue}-${sizeValue}`;
+                                  const matrixVariant = matrixVariants[key];
+                                  if (matrixVariant) {
+                                    variant.colors[0].sizeStocks![sizeValue] = matrixVariant.stock;
+                                    // Store SKU per size in sizeLabels for later use
+                                    if (!variant.colors[0].sizeLabels) {
+                                      variant.colors[0].sizeLabels = {};
+                                    }
+                                    if (matrixVariant.sku) {
+                                      variant.colors[0].sizeLabels![sizeValue] = matrixVariant.sku;
+                                    }
+                                  }
+                                });
+                              } else {
+                                // No sizes - use color's price and SKU directly
+                                const colorVariant = matrixVariants[colorValue];
+                                if (colorVariant) {
+                                  variant.colors[0].price = colorVariant.price;
+                                  variant.colors[0].compareAtPrice = colorVariant.compareAtPrice;
+                                  variant.sku = colorVariant.sku || '';
+                                }
+                              }
+
+                              newVariants.push(variant);
+                            });
+                            } else if (matrixSelectedSizes.length > 0) {
+                              // Only sizes, no colors
+                              const variant: Variant = {
+                                id: `variant-${Date.now()}-sizes`,
+                                price: '',
+                                compareAtPrice: '',
+                                sku: '',
+                                colors: [{
+                                  colorValue: '',
+                                  colorLabel: 'Default',
+                                  images: [],
+                                  stock: '',
+                                  sizes: matrixSelectedSizes,
+                                  sizeStocks: {},
+                                  sizeLabels: {},
+                                }],
+                              };
+
+                              // Add size stocks and SKUs
+                              matrixSelectedSizes.forEach((sizeValue) => {
+                                const key = sizeValue;
+                                const matrixVariant = matrixVariants[key];
+                                if (matrixVariant) {
+                                  variant.colors[0].sizeStocks![sizeValue] = matrixVariant.stock;
+                                  variant.colors[0].price = matrixVariant.price;
+                                  variant.colors[0].compareAtPrice = matrixVariant.compareAtPrice;
+                                  if (matrixVariant.sku) {
+                                    variant.colors[0].sizeLabels![sizeValue] = matrixVariant.sku;
+                                  }
+                                }
+                              });
+
+                              newVariants.push(variant);
+                            } else {
+                              // Single variant - no colors, no sizes
+                              const singleVariant = matrixVariants['single'];
+                              const variant: Variant = {
+                                id: `variant-${Date.now()}-single`,
+                                price: singleVariant?.price || '',
+                                compareAtPrice: singleVariant?.compareAtPrice || '',
+                                sku: singleVariant?.sku || '',
+                                colors: [{
+                                  colorValue: '',
+                                  colorLabel: 'Default',
+                                  images: [],
+                                  stock: singleVariant?.stock || '',
+                                  price: singleVariant?.price || undefined,
+                                  compareAtPrice: singleVariant?.compareAtPrice || undefined,
+                                  sizes: [],
+                                  sizeStocks: {},
+                                  sizeLabels: {},
+                                }],
+                              };
+                              newVariants.push(variant);
+                            }
+
+                            // Update formData with new variants
+                            setFormData((prev) => ({
+                              ...prev,
+                              variants: newVariants,
+                            }));
+
+                            // Disable matrix builder and show success
+                            setUseMatrixBuilder(false);
+                            const variantCount = newVariants.length;
+                            const colorCount = matrixSelectedColors.length;
+                            const sizeCount = matrixSelectedSizes.length;
+                            let message = `Successfully created ${variantCount} variant(s)!`;
+                            if (colorCount > 0) message += ` (${colorCount} color(s))`;
+                            if (sizeCount > 0) message += ` (${sizeCount} size(s))`;
+                            alert(message);
+                          }}
+                          className="bg-blue-600 text-white hover:bg-blue-700"
+                        >
+                          Generate Variants from Matrix
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-6 p-4 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 text-center">
+                      <p className="text-gray-500">
+                        {isClothingCategory() && matrixSelectedSizes.length === 0 && matrixSelectedColors.length === 0
+                          ? 'Please select at least one size or color to create variants'
+                          : 'Select colors and/or sizes to create variant matrix'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </div>
 
             {/* Publishing */}
@@ -2629,7 +3026,8 @@ function AddProductPageContent() {
               onChange={handleUploadColorImages}
             />
           </form>
-        </Card>
+          </Card>
+        </div>
       </div>
     </div>
   );

@@ -458,13 +458,30 @@ class ProductsService {
         ? variants.sort((a: { price: number }, b: { price: number }) => a.price - b.price)[0]
         : null;
 
-      // Get all unique colors from variants
+      // Get all unique colors from variants (support both new and old format)
       const colorSet = new Set<string>();
-      variants.forEach((v: { options?: Array<{ attributeKey?: string | null; value?: string | null }> }) => {
+      variants.forEach((v: any) => {
         const options = Array.isArray(v.options) ? v.options : [];
-        const colorOption = options.find((opt: { attributeKey?: string | null }) => opt.attributeKey === "color");
-        if (colorOption?.value) {
-          colorSet.add(colorOption.value.trim().toLowerCase());
+        const colorOption = options.find((opt: any) => {
+          // Support both new format (AttributeValue) and old format (attributeKey/value)
+          if (opt.attributeValue) {
+            return opt.attributeValue.attribute?.key === "color";
+          }
+          return opt.attributeKey === "color";
+        });
+        if (colorOption) {
+          let colorValue = "";
+          if (colorOption.attributeValue) {
+            // New format: get from translation or value
+            const translation = colorOption.attributeValue.translations?.find((t: { locale: string }) => t.locale === lang) || colorOption.attributeValue.translations?.[0];
+            colorValue = translation?.label || colorOption.attributeValue.value || "";
+          } else {
+            // Old format: use value directly
+            colorValue = colorOption.value || "";
+          }
+          if (colorValue) {
+            colorSet.add(colorValue.trim().toLowerCase());
+          }
         }
       });
       const availableColors = Array.from(colorSet);
@@ -1093,11 +1110,29 @@ class ProductsService {
             productDiscount: productDiscount > 0 ? productDiscount : null,
             stock: variant.stock,
             imageUrl: variant.imageUrl || null,
-            options: Array.isArray(variant.options) ? variant.options.map((opt: { attributeKey?: string | null; value?: string | null }) => ({
-              attribute: opt.attributeKey || "",
-              value: opt.value || "",
-              key: opt.attributeKey || "",
-            })) : [],
+            options: Array.isArray(variant.options) ? variant.options.map((opt: any) => {
+              // Support both new format (AttributeValue) and old format (attributeKey/value)
+              if (opt.attributeValue) {
+                // New format: use AttributeValue
+                const attrValue = opt.attributeValue;
+                const attr = attrValue.attribute;
+                const translation = attrValue.translations?.find((t: { locale: string }) => t.locale === lang) || attrValue.translations?.[0];
+                return {
+                  attribute: attr?.key || "",
+                  value: translation?.label || attrValue.value || "",
+                  key: attr?.key || "",
+                  valueId: attrValue.id,
+                  attributeId: attr?.id,
+                };
+              } else {
+                // Old format: use attributeKey/value
+                return {
+                  attribute: opt.attributeKey || "",
+                  value: opt.value || "",
+                  key: opt.attributeKey || "",
+                };
+              }
+            }) : [],
             available: variant.stock > 0,
           };
         }) : [],
@@ -1111,6 +1146,27 @@ class ProductsService {
       publishedAt: product.publishedAt,
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
+      productAttributes: Array.isArray(product.productAttributes) ? product.productAttributes.map((pa: any) => {
+        const attr = pa.attribute;
+        const attrTranslation = attr.translations?.find((t: { locale: string }) => t.locale === lang) || attr.translations?.[0];
+        
+        return {
+          id: pa.id,
+          attribute: {
+            id: attr.id,
+            key: attr.key,
+            name: attrTranslation?.name || attr.key,
+            values: Array.isArray(attr.values) ? attr.values.map((val: any) => {
+              const valTranslation = val.translations?.find((t: { locale: string }) => t.locale === lang) || val.translations?.[0];
+              return {
+                id: val.id,
+                value: val.value,
+                label: valTranslation?.label || val.value,
+              };
+            }) : [],
+          },
+        };
+      }) : [],
     };
   }
 }
