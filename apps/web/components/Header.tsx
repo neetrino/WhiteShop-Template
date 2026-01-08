@@ -5,12 +5,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useRef, Suspense } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { getStoredCurrency, setStoredCurrency, type CurrencyCode, CURRENCIES, formatPrice } from '../lib/currency';
-import { getStoredLanguage, setStoredLanguage } from '../lib/language';
 import { useTranslation } from '../lib/i18n';
 import { useAuth } from '../lib/auth/AuthContext';
 import { apiClient } from '../lib/api-client';
 import { CART_KEY, getCompareCount, getWishlistCount } from '../lib/storageCounts';
-import { GoogleTranslate } from './GoogleTranslate';
+import { LanguageSwitcherHeader } from './LanguageSwitcherHeader';
 import contactData from '../../../config/contact.json';
 import { Instagram, Facebook, Linkedin } from 'lucide-react';
 import { CompareIcon } from './icons/CompareIcon';
@@ -380,16 +379,8 @@ export function Header() {
     fetchCart();
   }, [isLoggedIn]);
 
-  // Load currency from localStorage and ensure language is 'en'
+  // Load currency from localStorage
   useEffect(() => {
-    // Only set language to English if it's not already 'en' to avoid infinite reload
-    const currentLanguage = getStoredLanguage();
-    if (currentLanguage !== 'en') {
-      setStoredLanguage('en');
-      // setStoredLanguage will reload the page, so we return early
-      return;
-    }
-    
     setSelectedCurrency(getStoredCurrency());
 
     const handleCurrencyUpdate = () => {
@@ -605,9 +596,9 @@ export function Header() {
               </div>
             </div>
 
-            {/* Currency and Google Translate */}
+            {/* Currency and Language Switcher */}
             <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-              <GoogleTranslate />
+              <LanguageSwitcherHeader />
               <div className="relative" ref={currencyRef}>
                 <button
                   type="button"
@@ -709,7 +700,7 @@ export function Header() {
               </div>
               {/* Language Switcher */}
               <div className="flex h-9 sm:h-10 items-center justify-center">
-                <GoogleTranslate />
+                <LanguageSwitcherHeader />
               </div>
             </div>
           </div>

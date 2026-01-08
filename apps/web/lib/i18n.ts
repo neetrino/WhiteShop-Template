@@ -5,7 +5,7 @@
 
 import { type LanguageCode } from './language';
 import { getStoredLanguage } from './language';
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState, useEffect } from 'react';
 
 // Pre-load all translations at build time for optimal performance
 import enCommon from '../locales/en/common.json';
@@ -46,12 +46,31 @@ import hyStores from '../locales/hy/stores.json';
 import hyReturns from '../locales/hy/returns.json';
 import hyRefundPolicy from '../locales/hy/refund-policy.json';
 
+import ruCommon from '../locales/ru/common.json';
+import ruHome from '../locales/ru/home.json';
+import ruProduct from '../locales/ru/product.json';
+import ruProducts from '../locales/ru/products.json';
+import ruAttributes from '../locales/ru/attributes.json';
+import ruDelivery from '../locales/ru/delivery.json';
+import ruAbout from '../locales/ru/about.json';
+import ruContact from '../locales/ru/contact.json';
+import ruFaq from '../locales/ru/faq.json';
+import ruLogin from '../locales/ru/login.json';
+import ruCookies from '../locales/ru/cookies.json';
+import ruDeliveryTerms from '../locales/ru/delivery-terms.json';
+import ruTerms from '../locales/ru/terms.json';
+import ruPrivacy from '../locales/ru/privacy.json';
+import ruSupport from '../locales/ru/support.json';
+import ruStores from '../locales/ru/stores.json';
+import ruReturns from '../locales/ru/returns.json';
+import ruRefundPolicy from '../locales/ru/refund-policy.json';
+
 // Type definitions for better type safety
 type Namespace = 'common' | 'home' | 'product' | 'products' | 'attributes' | 'delivery' | 'about' | 'contact' | 'faq' | 'login' | 'cookies' | 'delivery-terms' | 'terms' | 'privacy' | 'support' | 'stores' | 'returns' | 'refund-policy';
 type ProductField = 'title' | 'shortDescription' | 'longDescription';
 
 // Translation store - organized by language and namespace
-// Only en and hy are currently supported (as per plan.md)
+// Supports en, hy, and ru languages
 const translations: Partial<Record<LanguageCode, Record<Namespace, any>>> = {
   en: {
     common: enCommon,
@@ -92,6 +111,26 @@ const translations: Partial<Record<LanguageCode, Record<Namespace, any>>> = {
     stores: hyStores,
     returns: hyReturns,
     'refund-policy': hyRefundPolicy,
+  },
+  ru: {
+    common: ruCommon,
+    home: ruHome,
+    product: ruProduct,
+    products: ruProducts,
+    attributes: ruAttributes,
+    delivery: ruDelivery,
+    about: ruAbout,
+    contact: ruContact,
+    faq: ruFaq,
+    login: ruLogin,
+    cookies: ruCookies,
+    'delivery-terms': ruDeliveryTerms,
+    terms: ruTerms,
+    privacy: ruPrivacy,
+    support: ruSupport,
+    stores: ruStores,
+    returns: ruReturns,
+    'refund-policy': ruRefundPolicy,
   },
 };
 
@@ -430,10 +469,44 @@ export function getAttributeLabel(
  * ```
  */
 export function useTranslation() {
-  // Ensure we have a valid language (default to 'en' if undefined)
-  // getStoredLanguage() already handles server-side and returns 'en' if window is undefined
-  const storedLang = getStoredLanguage();
-  const lang: LanguageCode = (storedLang && storedLang in translations) ? storedLang : 'en';
+  // Initialize language state - start with stored language or 'en'
+  const getInitialLang = (): LanguageCode => {
+    if (typeof window === 'undefined') return 'en';
+    const storedLang = getStoredLanguage();
+    return (storedLang && storedLang in translations) ? storedLang : 'en';
+  };
+
+  const [lang, setLang] = useState<LanguageCode>(getInitialLang);
+
+  // Listen to language changes and update state reactively
+  useEffect(() => {
+    // Update language on mount to ensure we have the latest from localStorage
+    const updateLanguage = () => {
+      const storedLang = getStoredLanguage();
+      const newLang: LanguageCode = (storedLang && storedLang in translations) ? storedLang : 'en';
+      setLang((currentLang) => {
+        if (newLang !== currentLang) {
+          // Clear translation cache when language changes
+          clearTranslationCache();
+          return newLang;
+        }
+        return currentLang;
+      });
+    };
+
+    // Update immediately on mount
+    updateLanguage();
+
+    // Listen to language-updated events
+    const handleLanguageUpdate = () => {
+      updateLanguage();
+    };
+
+    window.addEventListener('language-updated', handleLanguageUpdate);
+    return () => {
+      window.removeEventListener('language-updated', handleLanguageUpdate);
+    };
+  }, []); // Empty dependency array - only run on mount/unmount
 
   // Memoized translation function with validation
   const translate = useCallback(
@@ -500,5 +573,5 @@ export function getAvailableNamespaces(): Namespace[] {
  * Get all available languages (only languages with translations)
  */
 export function getAvailableLanguages(): LanguageCode[] {
-  return ['en', 'hy'] as LanguageCode[];
+  return ['en', 'hy', 'ru'] as LanguageCode[];
 }

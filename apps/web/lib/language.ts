@@ -23,13 +23,18 @@ export function getStoredLanguage(): LanguageCode {
   return 'en';
 }
 
-export function setStoredLanguage(language: LanguageCode): void {
+export function setStoredLanguage(language: LanguageCode, options?: { skipReload?: boolean }): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
     window.dispatchEvent(new Event('language-updated'));
-    // Reload page to apply language changes
-    window.location.reload();
+    // Only reload if skipReload is not true
+    if (!options?.skipReload) {
+      // Use a small delay to ensure state updates are visible before reload
+      setTimeout(() => {
+        window.location.reload();
+      }, 50);
+    }
   } catch (error) {
     console.error('Failed to save language:', error);
   }
