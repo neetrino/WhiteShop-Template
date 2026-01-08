@@ -4,8 +4,10 @@ import { useState, FormEvent } from 'react';
 import { Button, Input, Card } from '@shop/ui';
 import Link from 'next/link';
 import { useAuth } from '../../lib/auth/AuthContext';
+import { useTranslation } from '../../lib/i18n';
 
 export default function RegisterPage() {
+  const { t } = useTranslation();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -38,35 +40,35 @@ export default function RegisterPage() {
 
     if (!acceptTerms) {
       console.log('❌ [REGISTER PAGE] Validation failed: Terms not accepted');
-      setError('Please accept the Terms of Service and Privacy Policy');
+      setError(t('register.errors.acceptTerms'));
       setIsSubmitting(false);
       return;
     }
 
     if (!email.trim() && !phone.trim()) {
       console.log('❌ [REGISTER PAGE] Validation failed: No email or phone');
-      setError('Please provide either email or phone number');
+      setError(t('register.errors.emailOrPhoneRequired'));
       setIsSubmitting(false);
       return;
     }
 
     if (!password) {
       console.log('❌ [REGISTER PAGE] Validation failed: No password');
-      setError('Please enter a password');
+      setError(t('register.errors.passwordRequired'));
       setIsSubmitting(false);
       return;
     }
 
     if (password.length < 6) {
       console.log('❌ [REGISTER PAGE] Validation failed: Password too short');
-      setError('Password must be at least 6 characters');
+      setError(t('register.errors.passwordMinLength'));
       setIsSubmitting(false);
       return;
     }
 
     if (password !== confirmPassword) {
       console.log('❌ [REGISTER PAGE] Validation failed: Passwords do not match');
-      setError('Passwords do not match');
+      setError(t('register.errors.passwordsDoNotMatch'));
       setIsSubmitting(false);
       return;
     }
@@ -107,7 +109,7 @@ export default function RegisterPage() {
         stack: err.stack,
         name: err.name,
       });
-      setError(err.message || 'Registration failed. Please try again.');
+      setError(err.message || t('register.errors.registrationFailed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -116,8 +118,8 @@ export default function RegisterPage() {
   return (
     <div className="max-w-md mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <Card className="p-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h1>
-        <p className="text-gray-600 mb-8">Sign up to get started with your shopping journey</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('register.title')}</h1>
+        <p className="text-gray-600 mb-8">{t('register.subtitle')}</p>
 
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -129,12 +131,12 @@ export default function RegisterPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
-                First Name
+                {t('register.form.firstName')}
               </label>
               <Input
                 id="firstName"
                 type="text"
-                placeholder="John"
+                placeholder={t('register.placeholders.firstName')}
                 className="w-full"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
@@ -143,12 +145,12 @@ export default function RegisterPage() {
             </div>
             <div>
               <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-2">
-                Last Name
+                {t('register.form.lastName')}
               </label>
               <Input
                 id="lastName"
                 type="text"
-                placeholder="Doe"
+                placeholder={t('register.placeholders.lastName')}
                 className="w-full"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
@@ -158,12 +160,12 @@ export default function RegisterPage() {
           </div>
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-              Email
+              {t('register.form.email')}
             </label>
             <Input
               id="email"
               type="email"
-              placeholder="your@email.com"
+              placeholder={t('register.placeholders.email')}
               className="w-full"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -172,12 +174,12 @@ export default function RegisterPage() {
           </div>
           <div>
             <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
-              Phone (optional if email provided)
+              {t('register.form.phone')}
             </label>
             <Input
               id="phone"
               type="tel"
-              placeholder="+374 XX XXX XXX"
+              placeholder={t('register.placeholders.phone')}
               className="w-full"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
@@ -186,12 +188,12 @@ export default function RegisterPage() {
           </div>
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-              Password
+              {t('register.form.password')}
             </label>
             <Input
               id="password"
               type="password"
-              placeholder="••••••••"
+              placeholder={t('register.placeholders.password')}
               className="w-full"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -199,17 +201,17 @@ export default function RegisterPage() {
               required
             />
             <p className="mt-1 text-xs text-gray-500">
-              Must be at least 6 characters
+              {t('register.passwordHint')}
             </p>
           </div>
           <div>
             <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-              Confirm Password
+              {t('register.form.confirmPassword')}
             </label>
             <Input
               id="confirmPassword"
               type="password"
-              placeholder="••••••••"
+              placeholder={t('register.placeholders.confirmPassword')}
               className="w-full"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
@@ -225,7 +227,7 @@ export default function RegisterPage() {
               onChange={(e) => {
                 setAcceptTerms(e.target.checked);
                 // Clear error when checkbox is checked
-                if (e.target.checked && error === 'Please accept the Terms of Service and Privacy Policy') {
+                if (e.target.checked && error === t('register.errors.acceptTerms')) {
                   setError(null);
                 }
               }}
@@ -234,18 +236,18 @@ export default function RegisterPage() {
               required
             />
             <label htmlFor="terms" className="ml-2 text-sm text-gray-600">
-              I agree to the{' '}
+              {t('register.form.acceptTerms')}{' '}
               <Link href="/terms" className="text-blue-600 hover:underline">
-                Terms of Service
+                {t('register.form.termsOfService')}
               </Link>{' '}
-              and{' '}
+              {t('register.form.and')}{' '}
               <Link href="/privacy" className="text-blue-600 hover:underline">
-                Privacy Policy
+                {t('register.form.privacyPolicy')}
               </Link>
             </label>
           </div>
-          {!acceptTerms && error === 'Please accept the Terms of Service and Privacy Policy' && (
-            <p className="text-xs text-red-600 -mt-2">You must accept the terms to continue</p>
+          {!acceptTerms && error === t('register.errors.acceptTerms') && (
+            <p className="text-xs text-red-600 -mt-2">{t('register.errors.mustAcceptTerms')}</p>
           )}
           <Button 
             variant="primary" 
@@ -253,15 +255,15 @@ export default function RegisterPage() {
             type="submit"
             disabled={isSubmitting || isLoading}
           >
-            {isSubmitting || isLoading ? 'Creating Account...' : 'Create Account'}
+            {isSubmitting || isLoading ? t('register.form.creatingAccount') : t('register.form.createAccount')}
           </Button>
         </form>
 
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
-            Already have an account?{' '}
+            {t('register.form.alreadyHaveAccount')}{' '}
             <Link href="/login" className="text-blue-600 hover:underline font-medium">
-              Sign in
+              {t('register.form.signIn')}
             </Link>
           </p>
         </div>

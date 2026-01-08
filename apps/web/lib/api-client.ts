@@ -161,10 +161,19 @@ class ApiClient {
   }
 
   /**
-   * Check if error should be logged (skip 401 errors)
+   * Check if error should be logged (skip 401 and 404 errors)
+   * 401 - authentication errors are expected
+   * 404 - resource not found is expected (e.g., product doesn't exist)
    */
   private shouldLogError(status: number): boolean {
-    return status !== 401;
+    return status !== 401 && status !== 404;
+  }
+
+  /**
+   * Check if error should be logged as warning (404 Not Found)
+   */
+  private shouldLogWarning(status: number): boolean {
+    return status === 404;
   }
 
   /**
@@ -273,9 +282,14 @@ class ApiClient {
       let errorText = '';
       let errorData: any = null;
       const isUnauthorized = response.status === 401;
+      const isNotFound = response.status === 404;
       
-      // Log error only if it's not a 401 (authentication errors are expected)
-      if (this.shouldLogError(response.status)) {
+      // Log 404 as warning (expected situation - resource doesn't exist)
+      if (this.shouldLogWarning(response.status)) {
+        console.warn(`⚠️ [API CLIENT] GET Not Found (404): ${url}`);
+      }
+      // Log other errors (except 401 which is expected)
+      else if (this.shouldLogError(response.status)) {
         console.error(`❌ [API CLIENT] GET Error: ${response.status} ${response.statusText}`, {
           url,
           status: response.status,
@@ -297,21 +311,31 @@ class ApiClient {
         if (errorText && errorText.trim().startsWith('{')) {
           try {
             errorData = JSON.parse(errorText);
-            // Don't log 401 errors (authentication errors are expected)
-            if (!isUnauthorized) {
+            // Log 404 as warning, other errors (except 401) as error
+            if (isNotFound) {
+              console.warn('⚠️ [API CLIENT] GET Not Found response:', errorData);
+            } else if (!isUnauthorized) {
               console.error('❌ [API CLIENT] GET Error response (JSON):', errorData);
             }
           } catch (parseErr) {
             // If JSON parse fails, use text as is
-            if (!isUnauthorized) {
+            if (isNotFound) {
+              console.warn('⚠️ [API CLIENT] GET Not Found response (text):', errorText);
+            } else if (!isUnauthorized) {
               console.error('❌ [API CLIENT] GET Error response (text):', errorText);
             }
           }
-        } else if (errorText && !isUnauthorized) {
-          console.error('❌ [API CLIENT] GET Error response (text):', errorText);
+        } else if (errorText) {
+          if (isNotFound) {
+            console.warn('⚠️ [API CLIENT] GET Not Found response (text):', errorText);
+          } else if (!isUnauthorized) {
+            console.error('❌ [API CLIENT] GET Error response (text):', errorText);
+          }
         }
       } catch (e) {
-        if (!isUnauthorized) {
+        if (isNotFound) {
+          console.warn('⚠️ [API CLIENT] Failed to read 404 response:', e);
+        } else if (!isUnauthorized) {
           console.error('❌ [API CLIENT] Failed to read error response:', e);
         }
       }

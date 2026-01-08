@@ -1,6 +1,7 @@
 {
   "title": "My Profile",
   "subtitle": "Manage your account information and preferences",
+  "myProfile": "My Profile",
   "tabs": {
     "dashboard": "Dashboard",
     "personal": "Personal Information",
@@ -23,7 +24,12 @@
     "items": "item",
     "itemsPlural": "items",
     "placedOn": "Placed on",
-    "viewDetails": "View Details →"
+    "viewDetails": "View Details →",
+    "quickActions": "Quick Actions",
+    "viewAllOrders": "View All Orders",
+    "manageAddresses": "Manage Addresses",
+    "continueShopping": "Continue Shopping",
+    "failedToLoad": "Failed to load dashboard data"
   },
   "personal": {
     "title": "Personal Information",
@@ -35,7 +41,12 @@
     "saving": "Saving...",
     "updatedSuccess": "Personal information updated successfully",
     "failedToUpdate": "Failed to update personal information",
-    "failedToLoad": "Failed to load profile"
+    "failedToLoad": "Failed to load profile",
+    "firstNamePlaceholder": "John",
+    "lastNamePlaceholder": "Doe",
+    "emailPlaceholder": "your@email.com",
+    "phonePlaceholder": "+374 XX XXX XXX",
+    "cancel": "Cancel"
   },
   "addresses": {
     "title": "Saved Addresses",
@@ -46,6 +57,11 @@
     "default": "Default",
     "noAddresses": "No addresses saved yet",
     "addFirst": "Add your first address to get started",
+    "country": "Country",
+    "countryArmenia": "Armenia",
+    "countryUS": "United States",
+    "countryRU": "Russia",
+    "countryGE": "Georgia",
     "form": {
       "title": "Address Form",
       "addTitle": "Add New Address",
@@ -61,6 +77,8 @@
       "phone": "Phone Number",
       "isDefault": "Set as default address",
       "save": "Save Address",
+      "update": "Update Address",
+      "add": "Add Address",
       "cancel": "Cancel",
       "saving": "Saving..."
     },
@@ -79,11 +97,14 @@
     "newPassword": "New Password",
     "confirmPassword": "Confirm New Password",
     "change": "Change Password",
-    "changing": "Changing...",
+    "changing": "Changing Password...",
     "changedSuccess": "Password changed successfully",
     "failedToChange": "Failed to change password",
     "passwordsDoNotMatch": "New passwords do not match",
-    "passwordMinLength": "Password must be at least 6 characters"
+    "passwordMinLength": "Password must be at least 6 characters",
+    "currentPasswordPlaceholder": "Enter your current password",
+    "newPasswordPlaceholder": "Enter new password (min. 6 characters)",
+    "confirmPasswordPlaceholder": "Confirm new password"
   },
   "orders": {
     "title": "My Orders",
@@ -99,7 +120,47 @@
     "reorder": "Reorder",
     "reordering": "Reordering...",
     "reorderSuccess": "Items added to cart successfully",
-    "reorderFailed": "Failed to add items to cart"
+    "reorderFailed": "Failed to add items to cart",
+    "page": "Page",
+    "of": "of",
+    "totalOrders": "total orders",
+    "previous": "Previous",
+    "next": "Next",
+    "item": "item",
+    "items": "items"
+  },
+  "orderDetails": {
+    "title": "Order #",
+    "placedOn": "Placed on",
+    "reorder": "Re-order",
+    "adding": "Adding...",
+    "close": "Close",
+    "loading": "Loading order details...",
+    "failedToLoad": "Failed to load order details",
+    "orderStatus": "Order Status",
+    "payment": "Payment",
+    "orderItems": "Order Items",
+    "orderSummary": "Order Summary",
+    "subtotal": "Subtotal",
+    "discount": "Discount",
+    "shipping": "Shipping",
+    "tax": "Tax",
+    "total": "Total",
+    "loadingTotals": "Loading totals...",
+    "shippingMethod": "Shipping Method",
+    "method": "Method",
+    "delivery": "Delivery",
+    "pickup": "Pickup",
+    "notSpecified": "Not specified",
+    "deliveryAddress": "Delivery Address",
+    "phone": "Phone",
+    "color": "Color",
+    "size": "Size",
+    "quantity": "Quantity",
+    "sku": "SKU",
+    "itemsAdded": "item(s) added to cart",
+    "skipped": "skipped",
+    "failedToAdd": "Failed to add items to cart. Please try again."
   },
   "common": {
     "loading": "Loading profile...",

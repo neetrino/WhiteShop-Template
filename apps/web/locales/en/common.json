@@ -58,7 +58,13 @@
     "title": "My Wishlist",
     "empty": "Your wishlist is empty",
     "emptyDescription": "Start adding products to your wishlist to save them for later.",
-    "totalCount": "Total items in wishlist"
+    "totalCount": "Total items in wishlist",
+    "tableHeaders": {
+      "productName": "Product name",
+      "unitPrice": "Unit price",
+      "stockStatus": "Stock status",
+      "action": "Action"
+    }
   },
   "compare": {
     "title": "Compare Products",

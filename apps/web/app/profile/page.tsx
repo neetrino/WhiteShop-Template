@@ -10,6 +10,7 @@ import { apiClient } from '../../lib/api-client';
 import { formatPrice, type CurrencyCode } from '../../lib/currency';
 import { ProfileMenuDrawer } from '../../components/ProfileMenuDrawer';
 import { UserAvatar } from '../../components/UserAvatar';
+import { useTranslation } from '../../lib/i18n';
 
 interface Address {
   _id?: string;
@@ -89,6 +90,7 @@ interface OrderDetails {
 function ProfilePageContent() {
   const router = useRouter();
   const { isLoggedIn, isLoading: authLoading, user: authUser } = useAuth();
+  const { t } = useTranslation();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -223,7 +225,7 @@ function ProfilePageContent() {
       setOrdersMeta(response.meta || null);
     } catch (err: any) {
       console.error('Error loading orders:', err);
-      setError(err.message || 'Failed to load orders');
+      setError(err.message || t('profile.orders.failedToLoad'));
     } finally {
       setOrdersLoading(false);
     }
@@ -266,7 +268,7 @@ function ProfilePageContent() {
       setDashboardData(data);
     } catch (err: any) {
       console.error('❌ [PROFILE] Error loading dashboard:', err);
-      setError(err.message || 'Failed to load dashboard data');
+      setError(err.message || t('profile.dashboard.failedToLoad'));
     } finally {
       setDashboardLoading(false);
     }
@@ -293,7 +295,7 @@ function ProfilePageContent() {
       });
     } catch (err: any) {
       console.error('Error loading profile:', err);
-      setError(err.message || 'Failed to load profile');
+      setError(err.message || t('profile.personal.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -308,14 +310,14 @@ function ProfilePageContent() {
     try {
       const updated = await apiClient.put<UserProfile>('/api/v1/users/profile', personalInfo);
       setProfile(updated);
-      setSuccess('Personal information updated successfully');
+      setSuccess(t('profile.personal.updatedSuccess'));
       
       // Update auth context user if needed
       if (authUser) {
         window.dispatchEvent(new Event('auth-updated'));
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to update personal information');
+      setError(err.message || t('profile.personal.failedToUpdate'));
     } finally {
       setSavingPersonal(false);
     }
@@ -331,11 +333,11 @@ function ProfilePageContent() {
       if (editingAddress?._id) {
         // Update existing address
         await apiClient.put(`/api/v1/users/addresses/${editingAddress._id}`, addressForm);
-        setSuccess('Address updated successfully');
+        setSuccess(t('profile.addresses.updatedSuccess'));
       } else {
         // Add new address
         await apiClient.post('/api/v1/users/addresses', addressForm);
-        setSuccess('Address added successfully');
+        setSuccess(t('profile.addresses.addedSuccess'));
       }
       
       await loadProfile();
@@ -343,33 +345,33 @@ function ProfilePageContent() {
       setEditingAddress(null);
       resetAddressForm();
     } catch (err: any) {
-      setError(err.message || 'Failed to save address');
+      setError(err.message || t('profile.addresses.failedToSave'));
     } finally {
       setSavingAddress(false);
     }
   };
 
   const handleDeleteAddress = async (addressId: string) => {
-    if (!confirm('Are you sure you want to delete this address?')) {
+    if (!confirm(t('profile.addresses.deleteConfirm'))) {
       return;
     }
 
     try {
       await apiClient.delete(`/api/v1/users/addresses/${addressId}`);
-      setSuccess('Address deleted successfully');
+      setSuccess(t('profile.addresses.deletedSuccess'));
       await loadProfile();
     } catch (err: any) {
-      setError(err.message || 'Failed to delete address');
+      setError(err.message || t('profile.addresses.failedToDelete'));
     }
   };
 
   const handleSetDefaultAddress = async (addressId: string) => {
     try {
       await apiClient.patch(`/api/v1/users/addresses/${addressId}/default`);
-      setSuccess('Default address updated successfully');
+      setSuccess(t('profile.addresses.defaultUpdatedSuccess'));
       await loadProfile();
     } catch (err: any) {
-      setError(err.message || 'Failed to set default address');
+      setError(err.message || t('profile.addresses.failedToSetDefault'));
     }
   };
 
@@ -415,13 +417,13 @@ function ProfilePageContent() {
     setSuccess(null);
 
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setError('New passwords do not match');
+      setError(t('profile.password.passwordsDoNotMatch'));
       setSavingPassword(false);
       return;
     }
 
     if (passwordForm.newPassword.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError(t('profile.password.passwordMinLength'));
       setSavingPassword(false);
       return;
     }
@@ -431,14 +433,14 @@ function ProfilePageContent() {
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword,
       });
-      setSuccess('Password changed successfully');
+      setSuccess(t('profile.password.changedSuccess'));
       setPasswordForm({
         currentPassword: '',
         newPassword: '',
         confirmPassword: '',
       });
     } catch (err: any) {
-      setError(err.message || 'Failed to change password');
+      setError(err.message || t('profile.password.failedToChange'));
     } finally {
       setSavingPassword(false);
     }
@@ -518,7 +520,7 @@ function ProfilePageContent() {
       setSelectedOrder(data);
     } catch (err: any) {
       console.error('Error loading order details:', err);
-      setOrderDetailsError(err.message || 'Failed to load order details');
+      setOrderDetailsError(err.message || t('profile.orderDetails.failedToLoad'));
     } finally {
       setOrderDetailsLoading(false);
     }
@@ -584,16 +586,17 @@ function ProfilePageContent() {
       
       // Show success message
       if (addedCount > 0) {
-        setSuccess(`${addedCount} item(s) added to cart${skippedCount > 0 ? `, ${skippedCount} skipped` : ''}`);
+        const skippedText = skippedCount > 0 ? `, ${skippedCount} ${t('profile.orderDetails.skipped')}` : '';
+        setSuccess(`${addedCount} ${t('profile.orderDetails.itemsAdded')}${skippedText}`);
         setTimeout(() => {
           router.push('/cart');
         }, 1500);
       } else {
-        setError('Failed to add items to cart. Please try again.');
+        setError(t('profile.orderDetails.failedToAdd'));
       }
     } catch (error: any) {
       console.error('[Profile][ReOrder] Error during re-order:', error);
-      setError('Failed to add items to cart. Please try again.');
+      setError(t('profile.orderDetails.failedToAdd'));
     } finally {
       setIsReordering(false);
     }
@@ -605,7 +608,7 @@ function ProfilePageContent() {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center">
-          <p className="text-gray-600">Loading profile...</p>
+          <p className="text-gray-600">{t('profile.common.loadingProfile')}</p>
         </div>
       </div>
     );
@@ -619,7 +622,7 @@ function ProfilePageContent() {
   const tabs = [
     {
       id: 'dashboard' as const,
-      label: 'Dashboard',
+      label: t('profile.tabs.dashboard'),
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -628,7 +631,7 @@ function ProfilePageContent() {
     },
     {
       id: 'personal' as const,
-      label: 'Personal Information',
+      label: t('profile.tabs.personal'),
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -637,7 +640,7 @@ function ProfilePageContent() {
     },
     {
       id: 'addresses' as const,
-      label: 'Addresses',
+      label: t('profile.tabs.addresses'),
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -647,7 +650,7 @@ function ProfilePageContent() {
     },
     {
       id: 'orders' as const,
-      label: 'Orders',
+      label: t('profile.tabs.orders'),
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -656,7 +659,7 @@ function ProfilePageContent() {
     },
     {
       id: 'password' as const,
-      label: 'Password',
+      label: t('profile.tabs.password'),
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -698,7 +701,7 @@ function ProfilePageContent() {
                 ? profile.firstName
                 : profile?.lastName
                 ? profile.lastName
-                : 'My Profile'}
+                : t('profile.myProfile')}
             </h1>
             {profile?.email && (
               <p className="text-gray-600 text-lg mb-1">{profile.email}</p>
@@ -707,7 +710,7 @@ function ProfilePageContent() {
               <p className="text-gray-500 text-sm">{profile.phone}</p>
             )}
             <p className="text-gray-600 mt-3 text-sm">
-              Manage your account information and preferences
+              {t('profile.subtitle')}
             </p>
           </div>
         </div>
@@ -764,7 +767,7 @@ function ProfilePageContent() {
           {dashboardLoading ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading dashboard...</p>
+              <p className="text-gray-600">{t('profile.dashboard.loading')}</p>
             </div>
           ) : dashboardData ? (
             <>
@@ -773,7 +776,7 @@ function ProfilePageContent() {
                 <Card className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Total Orders</p>
+                      <p className="text-sm font-medium text-gray-600">{t('profile.dashboard.totalOrders')}</p>
                       <p className="text-2xl font-bold text-gray-900 mt-1">
                         {dashboardData.stats.totalOrders}
                       </p>
@@ -789,7 +792,7 @@ function ProfilePageContent() {
                 <Card className="p-6">
                   <div className="flex items-center justify-between gap-4">
                     <div className="min-w-0 flex-1 overflow-hidden">
-                      <p className="text-sm font-medium text-gray-600">Total Spent</p>
+                      <p className="text-sm font-medium text-gray-600">{t('profile.dashboard.totalSpent')}</p>
                       <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1 break-words overflow-wrap-anywhere">
                         {formatPrice(dashboardData.stats.totalSpent, 'AMD')}
                       </p>
@@ -805,7 +808,7 @@ function ProfilePageContent() {
                 <Card className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Pending Orders</p>
+                      <p className="text-sm font-medium text-gray-600">{t('profile.dashboard.pendingOrders')}</p>
                       <p className="text-2xl font-bold text-gray-900 mt-1">
                         {dashboardData.stats.pendingOrders}
                       </p>
@@ -821,7 +824,7 @@ function ProfilePageContent() {
                 <Card className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Saved Addresses</p>
+                      <p className="text-sm font-medium text-gray-600">{t('profile.dashboard.savedAddresses')}</p>
                       <p className="text-2xl font-bold text-gray-900 mt-1">
                         {dashboardData.stats.addressesCount}
                       </p>
@@ -839,20 +842,20 @@ function ProfilePageContent() {
               {/* Recent Orders */}
               <Card className="p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-semibold text-gray-900">Recent Orders</h2>
+                  <h2 className="text-xl font-semibold text-gray-900">{t('profile.dashboard.recentOrders')}</h2>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => handleTabChange('orders')}
                   >
-                    View All
+                    {t('profile.dashboard.viewAll')}
                   </Button>
                 </div>
                 {dashboardData.recentOrders.length === 0 ? (
                   <div className="text-center py-12">
-                    <p className="text-gray-600 mb-4">You haven't placed any orders yet</p>
+                    <p className="text-gray-600 mb-4">{t('profile.dashboard.noOrders')}</p>
                     <Link href="/products">
-                      <Button variant="primary">Start Shopping</Button>
+                      <Button variant="primary">{t('profile.dashboard.startShopping')}</Button>
                     </Link>
                   </div>
                 ) : (
@@ -867,29 +870,29 @@ function ProfilePageContent() {
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex flex-wrap items-center gap-6 mb-2">
-                              <h3 className="text-lg font-semibold text-gray-900">Order #{order.number}</h3>
+                              <h3 className="text-lg font-semibold text-gray-900">{t('profile.orders.orderNumber')}{order.number}</h3>
                               <div>
-                                <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-0.5">Order Status</p>
+                                <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-0.5">{t('profile.dashboard.orderStatus')}</p>
                                 <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(order.status)}`}>
                                   {order.status}
                                 </span>
                               </div>
                               <div>
-                                <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-0.5">Payment Status</p>
+                                <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-0.5">{t('profile.dashboard.paymentStatus')}</p>
                                 <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${getPaymentStatusColor(order.paymentStatus)}`}>
                                   {order.paymentStatus}
                                 </span>
                               </div>
                             </div>
                             <p className="text-sm text-gray-600">
-                              {order.itemsCount} item{order.itemsCount !== 1 ? 's' : ''} • Placed on {new Date(order.createdAt).toLocaleDateString()}
+                              {order.itemsCount} {order.itemsCount !== 1 ? t('profile.orders.items') : t('profile.orders.item')} • {t('profile.dashboard.placedOn')} {new Date(order.createdAt).toLocaleDateString()}
                             </p>
                           </div>
                           <div className="text-right ml-4">
                             <p className="text-lg font-bold text-gray-900">
                               {formatPrice(order.total, (order.currency || 'AMD') as CurrencyCode)}
                             </p>
-                            <p className="text-xs text-gray-500 mt-1">View Details →</p>
+                            <p className="text-xs text-gray-500 mt-1">{t('profile.dashboard.viewDetails')}</p>
                           </div>
                         </div>
                       </Link>
@@ -900,7 +903,7 @@ function ProfilePageContent() {
 
               {/* Quick Actions */}
               <Card className="p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('profile.dashboard.quickActions')}</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Button
                     variant="outline"
@@ -910,7 +913,7 @@ function ProfilePageContent() {
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                     </svg>
-                    View All Orders
+                    {t('profile.dashboard.viewAllOrders')}
                   </Button>
                   <Button
                     variant="outline"
@@ -921,7 +924,7 @@ function ProfilePageContent() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
-                    Manage Addresses
+                    {t('profile.dashboard.manageAddresses')}
                   </Button>
                   <Link href="/products">
                     <Button
@@ -931,7 +934,7 @@ function ProfilePageContent() {
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                       </svg>
-                      Continue Shopping
+                      {t('profile.dashboard.continueShopping')}
                     </Button>
                   </Link>
                 </div>
@@ -939,7 +942,7 @@ function ProfilePageContent() {
             </>
           ) : (
             <Card className="p-6">
-              <p className="text-gray-600 text-center py-8">Failed to load dashboard data</p>
+              <p className="text-gray-600 text-center py-8">{t('profile.dashboard.failedToLoad')}</p>
             </Card>
           )}
         </div>
@@ -948,39 +951,39 @@ function ProfilePageContent() {
       {/* Personal Information Tab */}
       {activeTab === 'personal' && (
         <Card className="p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Personal Information</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">{t('profile.personal.title')}</h2>
           <form onSubmit={handleSavePersonalInfo} className="space-y-4 max-w-2xl">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input
-                label="First Name"
+                label={t('profile.personal.firstName')}
                 value={personalInfo.firstName}
                 onChange={(e) => setPersonalInfo({ ...personalInfo, firstName: e.target.value })}
-                placeholder="John"
+                placeholder={t('profile.personal.firstNamePlaceholder')}
               />
               <Input
-                label="Last Name"
+                label={t('profile.personal.lastName')}
                 value={personalInfo.lastName}
                 onChange={(e) => setPersonalInfo({ ...personalInfo, lastName: e.target.value })}
-                placeholder="Doe"
+                placeholder={t('profile.personal.lastNamePlaceholder')}
               />
             </div>
             <Input
-              label="Email"
+              label={t('profile.personal.email')}
               type="email"
               value={personalInfo.email}
               onChange={(e) => setPersonalInfo({ ...personalInfo, email: e.target.value })}
-              placeholder="your@email.com"
+              placeholder={t('profile.personal.emailPlaceholder')}
             />
             <Input
-              label="Phone"
+              label={t('profile.personal.phone')}
               type="tel"
               value={personalInfo.phone}
               onChange={(e) => setPersonalInfo({ ...personalInfo, phone: e.target.value })}
-              placeholder="+374 XX XXX XXX"
+              placeholder={t('profile.personal.phonePlaceholder')}
             />
             <div className="flex items-center gap-2 pt-4">
               <Button type="submit" variant="primary" disabled={savingPersonal}>
-                {savingPersonal ? 'Saving...' : 'Save Changes'}
+                {savingPersonal ? t('profile.personal.saving') : t('profile.personal.save')}
               </Button>
               <Button
                 type="button"
@@ -994,7 +997,7 @@ function ProfilePageContent() {
                   });
                 }}
               >
-                Cancel
+                {t('profile.personal.cancel')}
               </Button>
             </div>
           </form>
@@ -1006,7 +1009,7 @@ function ProfilePageContent() {
         <div className="space-y-6">
           <Card className="p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-gray-900">Saved Addresses</h2>
+              <h2 className="text-xl font-semibold text-gray-900">{t('profile.addresses.title')}</h2>
               <Button
                 variant="primary"
                 onClick={() => {
@@ -1015,7 +1018,7 @@ function ProfilePageContent() {
                   setEditingAddress(null);
                 }}
               >
-                {showAddressForm ? 'Cancel' : '+ Add New Address'}
+                {showAddressForm ? t('profile.addresses.form.cancel') : `+ ${t('profile.addresses.addNew')}`}
               </Button>
             </div>
 
@@ -1023,45 +1026,45 @@ function ProfilePageContent() {
             {showAddressForm && (
               <form onSubmit={handleSaveAddress} className="mb-6 p-4 bg-gray-50 rounded-lg space-y-4">
                 <h3 className="font-semibold text-gray-900">
-                  {editingAddress ? 'Edit Address' : 'Add New Address'}
+                  {editingAddress ? t('profile.addresses.form.editTitle') : t('profile.addresses.form.addTitle')}
                 </h3>
                 <Input
-                  label="Address Line 1"
+                  label={t('profile.addresses.form.addressLine1')}
                   value={addressForm.addressLine1}
                   onChange={(e) => setAddressForm({ ...addressForm, addressLine1: e.target.value })}
                   required
                 />
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Input
-                    label="City"
+                    label={t('profile.addresses.form.city')}
                     value={addressForm.city}
                     onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })}
                     required
                   />
                   <Input
-                    label="State/Province (Optional)"
+                    label={t('profile.addresses.form.state')}
                     value={addressForm.state}
                     onChange={(e) => setAddressForm({ ...addressForm, state: e.target.value })}
                   />
                   <Input
-                    label="Postal Code"
+                    label={t('profile.addresses.form.postalCode')}
                     value={addressForm.postalCode}
                     onChange={(e) => setAddressForm({ ...addressForm, postalCode: e.target.value })}
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Country
+                    {t('profile.addresses.country')}
                   </label>
                   <select
                     value={addressForm.countryCode}
                     onChange={(e) => setAddressForm({ ...addressForm, countryCode: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900"
                   >
-                    <option value="AM">Armenia</option>
-                    <option value="US">United States</option>
-                    <option value="RU">Russia</option>
-                    <option value="GE">Georgia</option>
+                    <option value="AM">{t('profile.addresses.countryArmenia')}</option>
+                    <option value="US">{t('profile.addresses.countryUS')}</option>
+                    <option value="RU">{t('profile.addresses.countryRU')}</option>
+                    <option value="GE">{t('profile.addresses.countryGE')}</option>
                   </select>
                 </div>
                 <label className="flex items-center">
@@ -1071,11 +1074,11 @@ function ProfilePageContent() {
                     onChange={(e) => setAddressForm({ ...addressForm, isDefault: e.target.checked })}
                     className="rounded border-gray-300 text-gray-900 focus:ring-gray-900"
                   />
-                  <span className="ml-2 text-sm text-gray-700">Set as default address</span>
+                  <span className="ml-2 text-sm text-gray-700">{t('profile.addresses.form.isDefault')}</span>
                 </label>
                 <div className="flex gap-2">
                   <Button type="submit" variant="primary" disabled={savingAddress}>
-                    {savingAddress ? 'Saving...' : editingAddress ? 'Update Address' : 'Add Address'}
+                    {savingAddress ? t('profile.addresses.form.saving') : editingAddress ? t('profile.addresses.form.update') : t('profile.addresses.form.add')}
                   </Button>
                   <Button
                     type="button"
@@ -1086,7 +1089,7 @@ function ProfilePageContent() {
                       resetAddressForm();
                     }}
                   >
-                    Cancel
+                    {t('profile.addresses.form.cancel')}
                   </Button>
                 </div>
               </form>
@@ -1105,7 +1108,7 @@ function ProfilePageContent() {
                         <div className="flex items-center gap-2 mb-2">
                           {address.isDefault && (
                             <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
-                              Default
+                              {t('profile.addresses.default')}
                             </span>
                           )}
                         </div>
@@ -1126,7 +1129,7 @@ function ProfilePageContent() {
                             size="sm"
                             onClick={() => handleSetDefaultAddress(address._id!)}
                           >
-                            Set Default
+                            {t('profile.addresses.setDefault')}
                           </Button>
                         )}
                         <Button
@@ -1134,7 +1137,7 @@ function ProfilePageContent() {
                           size="sm"
                           onClick={() => handleEditAddress(address)}
                         >
-                          Edit
+                          {t('profile.addresses.edit')}
                         </Button>
                         <Button
                           variant="outline"
@@ -1142,14 +1145,14 @@ function ProfilePageContent() {
                           onClick={() => handleDeleteAddress(address._id!)}
                           className="text-red-600 hover:text-red-700 hover:border-red-300"
                         >
-                          Delete
+                          {t('profile.addresses.delete')}
                         </Button>
                       </div>
                     </div>
                   </div>
                 ))
               ) : (
-                <p className="text-gray-500 text-center py-8">No addresses saved yet</p>
+                <p className="text-gray-500 text-center py-8">{t('profile.addresses.noAddresses')}</p>
               )}
             </div>
           </Card>
@@ -1159,7 +1162,7 @@ function ProfilePageContent() {
       {/* Orders Tab */}
       {activeTab === 'orders' && (
         <Card className="p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">My Orders</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">{t('profile.orders.title')}</h2>
           {ordersLoading ? (
             <div className="space-y-4">
               {[1, 2, 3].map((i) => (
@@ -1170,9 +1173,9 @@ function ProfilePageContent() {
             </div>
           ) : orders.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-600 mb-4">You haven't placed any orders yet</p>
+              <p className="text-gray-600 mb-4">{t('profile.orders.noOrders')}</p>
               <Link href="/products">
-                <Button variant="primary">Start Shopping</Button>
+                <Button variant="primary">{t('profile.dashboard.startShopping')}</Button>
               </Link>
             </div>
           ) : (
@@ -1187,29 +1190,29 @@ function ProfilePageContent() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex flex-wrap items-center gap-6 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">Order #{order.number}</h3>
+                        <h3 className="text-lg font-semibold text-gray-900">{t('profile.orders.orderNumber')}{order.number}</h3>
                         <div>
-                          <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-0.5">Order Status</p>
+                          <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-0.5">{t('profile.dashboard.orderStatus')}</p>
                           <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(order.status)}`}>
                             {order.status}
                           </span>
                         </div>
                         <div>
-                          <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-0.5">Payment Status</p>
+                          <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-0.5">{t('profile.dashboard.paymentStatus')}</p>
                           <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${getPaymentStatusColor(order.paymentStatus)}`}>
                             {order.paymentStatus}
                           </span>
                         </div>
                       </div>
                       <p className="text-sm text-gray-600">
-                        {order.itemsCount} item{order.itemsCount !== 1 ? 's' : ''} • Placed on {new Date(order.createdAt).toLocaleDateString()}
+                        {order.itemsCount} {order.itemsCount !== 1 ? t('profile.orders.items') : t('profile.orders.item')} • {t('profile.dashboard.placedOn')} {new Date(order.createdAt).toLocaleDateString()}
                       </p>
                     </div>
                     <div className="text-right ml-4">
                       <p className="text-lg font-bold text-gray-900">
                         {formatPrice(order.total, (order.currency || 'AMD') as CurrencyCode)}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">View Details →</p>
+                      <p className="text-xs text-gray-500 mt-1">{t('profile.dashboard.viewDetails')}</p>
                     </div>
                   </div>
                 </Link>
@@ -1219,7 +1222,7 @@ function ProfilePageContent() {
               {ordersMeta && ordersMeta.totalPages > 1 && (
                 <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-200">
                   <p className="text-sm text-gray-600">
-                    Page {ordersMeta.page} of {ordersMeta.totalPages} • {ordersMeta.total} total orders
+                    {t('profile.orders.page')} {ordersMeta.page} {t('profile.orders.of')} {ordersMeta.totalPages} • {ordersMeta.total} {t('profile.orders.totalOrders')}
                   </p>
                   <div className="flex gap-2">
                     <Button
@@ -1228,7 +1231,7 @@ function ProfilePageContent() {
                       onClick={() => setOrdersPage(prev => Math.max(1, prev - 1))}
                       disabled={ordersPage === 1 || ordersLoading}
                     >
-                      Previous
+                      {t('profile.orders.previous')}
                     </Button>
                     <Button
                       variant="outline"
@@ -1236,7 +1239,7 @@ function ProfilePageContent() {
                       onClick={() => setOrdersPage(prev => Math.min(ordersMeta.totalPages, prev + 1))}
                       disabled={ordersPage === ordersMeta.totalPages || ordersLoading}
                     >
-                      Next
+                      {t('profile.orders.next')}
                     </Button>
                   </div>
                 </div>
@@ -1249,35 +1252,35 @@ function ProfilePageContent() {
       {/* Password Tab */}
       {activeTab === 'password' && (
         <Card className="p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Change Password</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">{t('profile.password.title')}</h2>
           <form onSubmit={handleChangePassword} className="space-y-4 max-w-2xl">
             <Input
-              label="Current Password"
+              label={t('profile.password.currentPassword')}
               type="password"
               value={passwordForm.currentPassword}
               onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-              placeholder="Enter your current password"
+              placeholder={t('profile.password.currentPasswordPlaceholder')}
               required
             />
             <Input
-              label="New Password"
+              label={t('profile.password.newPassword')}
               type="password"
               value={passwordForm.newPassword}
               onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-              placeholder="Enter new password (min. 6 characters)"
+              placeholder={t('profile.password.newPasswordPlaceholder')}
               required
             />
             <Input
-              label="Confirm New Password"
+              label={t('profile.password.confirmPassword')}
               type="password"
               value={passwordForm.confirmPassword}
               onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-              placeholder="Confirm new password"
+              placeholder={t('profile.password.confirmPasswordPlaceholder')}
               required
             />
             <div className="pt-4">
               <Button type="submit" variant="primary" disabled={savingPassword}>
-                {savingPassword ? 'Changing Password...' : 'Change Password'}
+                {savingPassword ? t('profile.password.changing') : t('profile.password.change')}
               </Button>
             </div>
           </form>
@@ -1299,9 +1302,9 @@ function ProfilePageContent() {
               {/* Header */}
               <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Order #{selectedOrder.number}</h2>
+                  <h2 className="text-2xl font-bold text-gray-900">{t('profile.orderDetails.title')}{selectedOrder.number}</h2>
                   <p className="text-sm text-gray-600 mt-1">
-                    Placed on {new Date(selectedOrder.createdAt).toLocaleDateString()}
+                    {t('profile.orderDetails.placedOn')} {new Date(selectedOrder.createdAt).toLocaleDateString()}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1311,11 +1314,12 @@ function ProfilePageContent() {
                     variant="primary"
                     size="sm"
                   >
-                    {isReordering ? 'Adding...' : 'Re-order'}
+                    {isReordering ? t('profile.orderDetails.adding') : t('profile.orderDetails.reorder')}
                   </Button>
                   <button
                     onClick={() => setSelectedOrder(null)}
                     className="text-gray-400 hover:text-gray-500 focus:outline-none"
+                    aria-label={t('profile.orderDetails.close')}
                   >
                     <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1329,12 +1333,12 @@ function ProfilePageContent() {
                 {orderDetailsLoading ? (
                   <div className="text-center py-12">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Loading order details...</p>
+                    <p className="text-gray-600">{t('profile.orderDetails.loading')}</p>
                   </div>
                 ) : orderDetailsError ? (
                   <div className="text-center py-12">
                     <p className="text-red-600 mb-4">{orderDetailsError}</p>
-                    <Button onClick={() => setSelectedOrder(null)} variant="outline">Close</Button>
+                    <Button onClick={() => setSelectedOrder(null)} variant="outline">{t('profile.orderDetails.close')}</Button>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1342,20 +1346,20 @@ function ProfilePageContent() {
                     <div className="lg:col-span-2 space-y-6">
                       {/* Status */}
                       <Card className="p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Status</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('profile.orderDetails.orderStatus')}</h3>
                         <div className="flex flex-wrap items-center gap-4">
                           <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(selectedOrder.status)}`}>
                             {selectedOrder.status}
                           </span>
                           <span className={`px-3 py-1 rounded-full text-sm font-medium ${getPaymentStatusColor(selectedOrder.paymentStatus)}`}>
-                            Payment: {selectedOrder.paymentStatus}
+                            {t('profile.orderDetails.payment')}: {selectedOrder.paymentStatus}
                           </span>
                         </div>
                       </Card>
 
                       {/* Order Items */}
                       <Card className="p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-6">Order Items</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-6">{t('profile.orderDetails.orderItems')}</h3>
                         <div className="space-y-4">
                           {selectedOrder.items.map((item, index) => {
                             // Extract color and size from variant options (case-insensitive matching)
@@ -1389,7 +1393,7 @@ function ProfilePageContent() {
                                     <div className="flex flex-wrap gap-3 mt-2 mb-2">
                                       {color && (
                                         <div className="flex items-center gap-2">
-                                          <span className="text-sm font-medium text-gray-700">Color:</span>
+                                          <span className="text-sm font-medium text-gray-700">{t('profile.orderDetails.color')}:</span>
                                           <div className="flex items-center gap-2">
                                             <div 
                                               className="w-5 h-5 rounded-full border border-gray-300"
@@ -1404,16 +1408,16 @@ function ProfilePageContent() {
                                       )}
                                       {size && (
                                         <div className="flex items-center gap-2">
-                                          <span className="text-sm font-medium text-gray-700">Size:</span>
+                                          <span className="text-sm font-medium text-gray-700">{t('profile.orderDetails.size')}:</span>
                                           <span className="text-sm text-gray-900 uppercase">{size}</span>
                                         </div>
                                       )}
                                     </div>
                                   )}
                                   
-                                  <p className="text-sm text-gray-600">SKU: {item.sku}</p>
+                                  <p className="text-sm text-gray-600">{t('profile.orderDetails.sku')}: {item.sku}</p>
                                   <p className="text-sm text-gray-600 mt-2">
-                                    Quantity: {item.quantity} × {formatPrice(item.price, (selectedOrder.totals.currency || 'AMD') as CurrencyCode)} = {formatPrice(item.total, (selectedOrder.totals.currency || 'AMD') as CurrencyCode)}
+                                    {t('profile.orderDetails.quantity')}: {item.quantity} × {formatPrice(item.price, (selectedOrder.totals.currency || 'AMD') as CurrencyCode)} = {formatPrice(item.total, (selectedOrder.totals.currency || 'AMD') as CurrencyCode)}
                                   </p>
                                 </div>
                               </div>
@@ -1427,56 +1431,56 @@ function ProfilePageContent() {
                     {/* Order Summary + Shipping */}
                     <div className="space-y-4">
                       <Card className="p-6 sticky top-4">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-6">Order Summary</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-6">{t('profile.orderDetails.orderSummary')}</h3>
                         <div className="space-y-4 mb-6">
                           {selectedOrder.totals ? (
                             <>
                               <div className="flex justify-between text-gray-600">
-                                <span>Subtotal</span>
+                                <span>{t('profile.orderDetails.subtotal')}</span>
                                 <span>{formatPrice(selectedOrder.totals.subtotal, (selectedOrder.totals.currency || 'AMD') as CurrencyCode)}</span>
                               </div>
                               {selectedOrder.totals.discount > 0 && (
                                 <div className="flex justify-between text-gray-600">
-                                  <span>Discount</span>
+                                  <span>{t('profile.orderDetails.discount')}</span>
                                   <span>-{formatPrice(selectedOrder.totals.discount, (selectedOrder.totals.currency || 'AMD') as CurrencyCode)}</span>
                                 </div>
                               )}
                               <div className="flex justify-between text-gray-600">
-                                <span>Shipping</span>
+                                <span>{t('profile.orderDetails.shipping')}</span>
                                 <span>{formatPrice(selectedOrder.totals.shipping, (selectedOrder.totals.currency || 'AMD') as CurrencyCode)}</span>
                               </div>
                               <div className="flex justify-between text-gray-600">
-                                <span>Tax</span>
+                                <span>{t('profile.orderDetails.tax')}</span>
                                 <span>{formatPrice(selectedOrder.totals.tax, (selectedOrder.totals.currency || 'AMD') as CurrencyCode)}</span>
                               </div>
                               <div className="border-t border-gray-200 pt-4">
                                 <div className="flex justify-between text-lg font-bold text-gray-900">
-                                  <span>Total</span>
+                                  <span>{t('profile.orderDetails.total')}</span>
                                   <span>{formatPrice(selectedOrder.totals.total, (selectedOrder.totals.currency || 'AMD') as CurrencyCode)}</span>
                                 </div>
                               </div>
                             </>
                           ) : (
-                            <div className="text-gray-600">Loading totals...</div>
+                            <div className="text-gray-600">{t('profile.orderDetails.loadingTotals')}</div>
                           )}
                         </div>
                       </Card>
 
                       {/* Shipping Method */}
                       <Card className="p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Shipping Method</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('profile.orderDetails.shippingMethod')}</h3>
                         <div className="text-gray-700 space-y-3">
                           <div>
-                            <span className="font-medium">Method: </span>
+                            <span className="font-medium">{t('profile.orderDetails.method')}: </span>
                             <span className="capitalize">
-                              {selectedOrder.shippingMethod === 'delivery' ? 'Delivery' : 
-                               selectedOrder.shippingMethod === 'pickup' ? 'Pickup' : 
-                               selectedOrder.shippingMethod || 'Not specified'}
+                              {selectedOrder.shippingMethod === 'delivery' ? t('profile.orderDetails.delivery') : 
+                               selectedOrder.shippingMethod === 'pickup' ? t('profile.orderDetails.pickup') : 
+                               selectedOrder.shippingMethod || t('profile.orderDetails.notSpecified')}
                             </span>
                           </div>
                           {selectedOrder.shippingMethod === 'delivery' && selectedOrder.shippingAddress && (
                             <div className="mt-3 pt-3 border-t border-gray-200">
-                              <p className="font-medium text-gray-900 mb-2">Delivery Address:</p>
+                              <p className="font-medium text-gray-900 mb-2">{t('profile.orderDetails.deliveryAddress')}:</p>
                               <div className="text-gray-600">
                                 {selectedOrder.shippingAddress.firstName && selectedOrder.shippingAddress.lastName && (
                                   <p>{selectedOrder.shippingAddress.firstName} {selectedOrder.shippingAddress.lastName}</p>
@@ -1490,7 +1494,7 @@ function ProfilePageContent() {
                                   </p>
                                 )}
                                 {selectedOrder.shippingAddress.countryCode && <p>{selectedOrder.shippingAddress.countryCode}</p>}
-                                {selectedOrder.shippingAddress.phone && <p className="mt-2">Phone: {selectedOrder.shippingAddress.phone}</p>}
+                                {selectedOrder.shippingAddress.phone && <p className="mt-2">{t('profile.orderDetails.phone')}: {selectedOrder.shippingAddress.phone}</p>}
                               </div>
                             </div>
                           )}

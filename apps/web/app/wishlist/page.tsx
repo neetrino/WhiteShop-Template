@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
 import { apiClient } from '../../lib/api-client';
 import { formatPrice, getStoredCurrency } from '../../lib/currency';
+import { getStoredLanguage } from '../../lib/language';
 import { useTranslation } from '../../lib/i18n';
 import { useAuth } from '../../lib/auth/AuthContext';
 
@@ -244,16 +245,16 @@ export default function WishlistPage() {
           {/* Table Header */}
           <div className="hidden md:grid md:grid-cols-12 gap-4 px-6 py-4 bg-gray-50 border-b border-gray-200">
             <div className="md:col-span-5">
-              <span className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Product name</span>
+              <span className="text-sm font-semibold text-gray-900 uppercase tracking-wide">{t('common.wishlist.tableHeaders.productName')}</span>
             </div>
             <div className="md:col-span-2 text-center">
-              <span className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Unit price</span>
+              <span className="text-sm font-semibold text-gray-900 uppercase tracking-wide">{t('common.wishlist.tableHeaders.unitPrice')}</span>
             </div>
             <div className="md:col-span-2 text-center">
-              <span className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Stock status</span>
+              <span className="text-sm font-semibold text-gray-900 uppercase tracking-wide">{t('common.wishlist.tableHeaders.stockStatus')}</span>
             </div>
             <div className="md:col-span-3 text-center">
-              <span className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Action</span>
+              <span className="text-sm font-semibold text-gray-900 uppercase tracking-wide">{t('common.wishlist.tableHeaders.action')}</span>
             </div>
           </div>
 

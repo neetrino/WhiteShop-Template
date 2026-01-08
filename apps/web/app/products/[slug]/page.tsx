@@ -276,9 +276,17 @@ export default function ProductPage({ params }: ProductPageProps) {
         const sizeOption = initialVariant.options?.find(opt => opt.key === 'size');
         if (sizeOption) setSelectedSize(sizeOption.value);
       }
-    } catch (error) {
-      console.error('Error fetching product:', error);
-      // Don't clear existing product on error - keep showing the last successfully loaded product
+    } catch (error: any) {
+      console.error('[PRODUCT PAGE] Error fetching product:', error);
+      
+      // If product not found (404), clear product state and show error
+      if (error?.status === 404) {
+        console.warn(`[PRODUCT PAGE] Product '${slug}' not found or not published`);
+        setProduct(null);
+        // Optionally redirect to 404 page or show error message
+        // router.push('/404');
+      }
+      // Don't clear existing product on other errors - keep showing the last successfully loaded product
       // This prevents losing the product when switching languages if translation doesn't exist
     } finally {
       setLoading(false);
@@ -566,17 +574,19 @@ export default function ProductPage({ params }: ProductPageProps) {
     })));
   }
 
-  // Debug logging for stock display
-  console.log('📦 [PRODUCT PAGE] Stock information:', {
-    productId: product?.id,
-    productSlug: product?.slug,
-    colorGroups: colorGroups.map(g => ({ color: g.color, stock: g.stock })),
-    sizeGroups: sizeGroups.map(g => ({ size: g.size, stock: g.stock })),
-    attributeGroups: Array.from(attributeGroups.entries()).map(([key, groups]) => ({
-      key,
-      groups: groups.map(g => ({ value: g.value, stock: g.stock })),
-    })),
-  });
+  // Debug logging for stock display - only log when product is loaded
+  if (product && product.id) {
+    console.log('📦 [PRODUCT PAGE] Stock information:', {
+      productId: product.id,
+      productSlug: product.slug,
+      colorGroups: colorGroups.map(g => ({ color: g.color, stock: g.stock })),
+      sizeGroups: sizeGroups.map(g => ({ size: g.size, stock: g.stock })),
+      attributeGroups: Array.from(attributeGroups.entries()).map(([key, groups]) => ({
+        key,
+        groups: groups.map(g => ({ value: g.value, stock: g.stock })),
+      })),
+    });
+  }
 
   const currentVariant = selectedVariant || findVariantByColorAndSize(selectedColor, selectedSize) || product?.variants?.[0] || null;
   const price = currentVariant?.price || 0;

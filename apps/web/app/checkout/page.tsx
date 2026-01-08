@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,6 +10,7 @@ import { apiClient } from '../../lib/api-client';
 import { formatPrice, getStoredCurrency } from '../../lib/currency';
 import { getStoredLanguage } from '../../lib/language';
 import { useAuth } from '../../lib/auth/AuthContext';
+import { useTranslation } from '../../lib/i18n';
 
 interface CartItem {
   id: string;
@@ -42,138 +43,27 @@ interface Cart {
   itemsCount: number;
 }
 
-// Validation schema with conditional shipping address
-const checkoutSchema = z.object({
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Last name is required'),
-  email: z.string().email('Invalid email address').min(1, 'Email is required'),
-  phone: z.string().min(1, 'Phone is required').regex(/^\+?[0-9]{8,15}$/, 'Invalid phone number'),
-  shippingMethod: z.enum(['pickup', 'delivery'], {
-    message: 'Please select a shipping method',
-  }),
-  paymentMethod: z.enum(['idram', 'arca', 'cash_on_delivery'], {
-    message: 'Please select a payment method',
-  }),
-  // Shipping address fields - required only for delivery
-  shippingAddress: z.string().optional(),
-  shippingCity: z.string().optional(),
-  shippingPostalCode: z.string().optional(),
-  shippingPhone: z.string().optional(),
-  // Payment details - optional, can be filled in modal
-  cardNumber: z.string().optional(),
-  cardExpiry: z.string().optional(),
-  cardCvv: z.string().optional(),
-  cardHolderName: z.string().optional(),
-}).refine((data) => {
-  // If delivery is selected, shipping address is required
-  if (data.shippingMethod === 'delivery') {
-    return data.shippingAddress && data.shippingAddress.trim().length > 0;
-  }
-  return true;
-}, {
-  message: 'Address is required for delivery',
-  path: ['shippingAddress'],
-}).refine((data) => {
-  // If delivery is selected, shipping city is required
-  if (data.shippingMethod === 'delivery') {
-    return data.shippingCity && data.shippingCity.trim().length > 0;
-  }
-  return true;
-}, {
-  message: 'City is required for delivery',
-  path: ['shippingCity'],
-}).refine((data) => {
-  // If delivery is selected, shipping postal code is required
-  if (data.shippingMethod === 'delivery') {
-    return data.shippingPostalCode && data.shippingPostalCode.trim().length > 0;
-  }
-  return true;
-}, {
-  message: 'Postal code is required for delivery',
-  path: ['shippingPostalCode'],
-}).refine((data) => {
-  // If delivery is selected, shipping phone is required
-  if (data.shippingMethod === 'delivery') {
-    return data.shippingPhone && data.shippingPhone.trim().length > 0;
-  }
-  return true;
-}, {
-  message: 'Phone number is required for delivery',
-  path: ['shippingPhone'],
-}).refine((data) => {
-  // Validate phone format if provided
-  if (data.shippingPhone && data.shippingPhone.trim().length > 0) {
-    return /^\+?[0-9]{8,15}$/.test(data.shippingPhone);
-  }
-  return true;
-}, {
-  message: 'Invalid phone number format',
-  path: ['shippingPhone'],
-}).refine((data) => {
-  // If ArCa or Idram is selected, card number is required
-  if (data.paymentMethod === 'arca' || data.paymentMethod === 'idram') {
-    return data.cardNumber && data.cardNumber.replace(/\s/g, '').length >= 13;
-  }
-  return true;
-}, {
-  message: 'Card number is required',
-  path: ['cardNumber'],
-}).refine((data) => {
-  // If ArCa or Idram is selected, card expiry is required
-  if (data.paymentMethod === 'arca' || data.paymentMethod === 'idram') {
-    return data.cardExpiry && /^\d{2}\/\d{2}$/.test(data.cardExpiry);
-  }
-  return true;
-}, {
-  message: 'Card expiry date is required',
-  path: ['cardExpiry'],
-}).refine((data) => {
-  // If ArCa or Idram is selected, CVV is required
-  if (data.paymentMethod === 'arca' || data.paymentMethod === 'idram') {
-    return data.cardCvv && data.cardCvv.length >= 3;
-  }
-  return true;
-}, {
-  message: 'CVV is required',
-  path: ['cardCvv'],
-}).refine((data) => {
-  // If ArCa or Idram is selected, cardholder name is required
-  if (data.paymentMethod === 'arca' || data.paymentMethod === 'idram') {
-    return data.cardHolderName && data.cardHolderName.trim().length > 0;
-  }
-  return true;
-}, {
-  message: 'Cardholder name is required',
-  path: ['cardHolderName'],
-});
-
-type CheckoutFormData = z.infer<typeof checkoutSchema>;
-
-// Payment methods configuration
-const paymentMethods = [
-  {
-    id: 'cash_on_delivery' as const,
-    name: 'Cash on Delivery',
-    description: 'Pay with cash when you receive your order',
-    logo: null,
-  },
-  {
-    id: 'idram' as const,
-    name: 'Idram',
-    description: 'Pay with Idram wallet or card',
-    logo: '/assets/payments/idram.svg',
-  },
-  {
-    id: 'arca' as const,
-    name: 'ArCa',
-    description: 'Pay with ArCa card',
-    logo: '/assets/payments/arca.svg',
-  },
-];
+type CheckoutFormData = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  shippingMethod: 'pickup' | 'delivery';
+  paymentMethod: 'idram' | 'arca' | 'cash_on_delivery';
+  shippingAddress?: string;
+  shippingCity?: string;
+  shippingPostalCode?: string;
+  shippingPhone?: string;
+  cardNumber?: string;
+  cardExpiry?: string;
+  cardCvv?: string;
+  cardHolderName?: string;
+};
 
 export default function CheckoutPage() {
   const router = useRouter();
   const { isLoggedIn, isLoading, user } = useAuth();
+  const { t } = useTranslation();
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -186,6 +76,124 @@ export default function CheckoutPage() {
   const [showCardModal, setShowCardModal] = useState(false);
   const [deliveryPrice, setDeliveryPrice] = useState<number | null>(null);
   const [loadingDeliveryPrice, setLoadingDeliveryPrice] = useState(false);
+
+  // Payment methods configuration
+  const paymentMethods = [
+    {
+      id: 'cash_on_delivery' as const,
+      name: t('checkout.payment.cashOnDelivery'),
+      description: t('checkout.payment.cashOnDeliveryDescription'),
+      logo: null,
+    },
+    {
+      id: 'idram' as const,
+      name: t('checkout.payment.idram'),
+      description: t('checkout.payment.idramDescription'),
+      logo: '/assets/payments/idram.svg',
+    },
+    {
+      id: 'arca' as const,
+      name: t('checkout.payment.arca'),
+      description: t('checkout.payment.arcaDescription'),
+      logo: '/assets/payments/arca.svg',
+    },
+  ];
+
+  // Create validation schema with translations
+  const checkoutSchema = useMemo(() => z.object({
+    firstName: z.string().min(1, t('checkout.errors.firstNameRequired')),
+    lastName: z.string().min(1, t('checkout.errors.lastNameRequired')),
+    email: z.string().email(t('checkout.errors.invalidEmail')).min(1, t('checkout.errors.emailRequired')),
+    phone: z.string().min(1, t('checkout.errors.phoneRequired')).regex(/^\+?[0-9]{8,15}$/, t('checkout.errors.invalidPhone')),
+    shippingMethod: z.enum(['pickup', 'delivery'], {
+      message: t('checkout.errors.selectShippingMethod'),
+    }),
+    paymentMethod: z.enum(['idram', 'arca', 'cash_on_delivery'], {
+      message: t('checkout.errors.selectPaymentMethod'),
+    }),
+    // Shipping address fields - required only for delivery
+    shippingAddress: z.string().optional(),
+    shippingCity: z.string().optional(),
+    shippingPostalCode: z.string().optional(),
+    shippingPhone: z.string().optional(),
+    // Payment details - optional, can be filled in modal
+    cardNumber: z.string().optional(),
+    cardExpiry: z.string().optional(),
+    cardCvv: z.string().optional(),
+    cardHolderName: z.string().optional(),
+  }).refine((data) => {
+    if (data.shippingMethod === 'delivery') {
+      return data.shippingAddress && data.shippingAddress.trim().length > 0;
+    }
+    return true;
+  }, {
+    message: t('checkout.errors.addressRequired'),
+    path: ['shippingAddress'],
+  }).refine((data) => {
+    if (data.shippingMethod === 'delivery') {
+      return data.shippingCity && data.shippingCity.trim().length > 0;
+    }
+    return true;
+  }, {
+    message: t('checkout.errors.cityRequired'),
+    path: ['shippingCity'],
+  }).refine((data) => {
+    if (data.shippingMethod === 'delivery') {
+      return data.shippingPostalCode && data.shippingPostalCode.trim().length > 0;
+    }
+    return true;
+  }, {
+    message: t('checkout.errors.postalCodeRequired'),
+    path: ['shippingPostalCode'],
+  }).refine((data) => {
+    if (data.shippingMethod === 'delivery') {
+      return data.shippingPhone && data.shippingPhone.trim().length > 0;
+    }
+    return true;
+  }, {
+    message: t('checkout.errors.phoneRequiredDelivery'),
+    path: ['shippingPhone'],
+  }).refine((data) => {
+    if (data.shippingPhone && data.shippingPhone.trim().length > 0) {
+      return /^\+?[0-9]{8,15}$/.test(data.shippingPhone);
+    }
+    return true;
+  }, {
+    message: t('checkout.errors.invalidPhoneFormat'),
+    path: ['shippingPhone'],
+  }).refine((data) => {
+    if (data.paymentMethod === 'arca' || data.paymentMethod === 'idram') {
+      return data.cardNumber && data.cardNumber.replace(/\s/g, '').length >= 13;
+    }
+    return true;
+  }, {
+    message: t('checkout.errors.cardNumberRequired'),
+    path: ['cardNumber'],
+  }).refine((data) => {
+    if (data.paymentMethod === 'arca' || data.paymentMethod === 'idram') {
+      return data.cardExpiry && /^\d{2}\/\d{2}$/.test(data.cardExpiry);
+    }
+    return true;
+  }, {
+    message: t('checkout.errors.cardExpiryRequired'),
+    path: ['cardExpiry'],
+  }).refine((data) => {
+    if (data.paymentMethod === 'arca' || data.paymentMethod === 'idram') {
+      return data.cardCvv && data.cardCvv.length >= 3;
+    }
+    return true;
+  }, {
+    message: t('checkout.errors.cvvRequired'),
+    path: ['cardCvv'],
+  }).refine((data) => {
+    if (data.paymentMethod === 'arca' || data.paymentMethod === 'idram') {
+      return data.cardHolderName && data.cardHolderName.trim().length > 0;
+    }
+    return true;
+  }, {
+    message: t('checkout.errors.cardHolderNameRequired'),
+    path: ['cardHolderName'],
+  }), [t]);
 
   // Debug: Log modal state changes
   useEffect(() => {
@@ -552,7 +560,7 @@ export default function CheckoutPage() {
       });
     } catch (error) {
       console.error('Error fetching cart:', error);
-      setError('Failed to load cart');
+      setError(t('checkout.errors.failedToLoadCart'));
     } finally {
       setLoading(false);
     }
@@ -584,7 +592,7 @@ export default function CheckoutPage() {
           hasShippingPostalCode,
           hasShippingPhone
         });
-        setError('Please fill in all shipping address fields');
+        setError(t('checkout.errors.fillShippingAddress'));
         // Scroll to shipping address section
         const shippingSection = document.querySelector('[data-shipping-section]');
         if (shippingSection) {
@@ -618,7 +626,7 @@ export default function CheckoutPage() {
 
     try {
       if (!cart) {
-        throw new Error('Cart is empty');
+        throw new Error(t('checkout.errors.cartEmpty'));
       }
 
       let cartId = cart.id;
@@ -707,7 +715,7 @@ export default function CheckoutPage() {
       router.push(`/orders/${response.order.number}`);
     } catch (err: any) {
       console.error('[Checkout] Error creating order:', err);
-      setError(err.message || 'Failed to create order. Please try again.');
+      setError(err.message || t('checkout.errors.failedToCreateOrder'));
     }
   }
 
@@ -730,11 +738,11 @@ export default function CheckoutPage() {
   if (!cart || cart.items.length === 0) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Checkout</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">{t('checkout.title')}</h1>
         <Card className="p-6 text-center">
-          <p className="text-gray-600 mb-4">Your cart is empty</p>
+          <p className="text-gray-600 mb-4">{t('checkout.errors.cartEmpty')}</p>
           <Button variant="primary" onClick={() => router.push('/products')}>
-            Continue Shopping
+            {t('checkout.buttons.continueShopping')}
           </Button>
         </Card>
       </div>
@@ -743,7 +751,7 @@ export default function CheckoutPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Checkout</h1>
+      <h1 className="text-3xl font-bold text-gray-900 mb-8">{t('checkout.title')}</h1>
 
       <form onSubmit={handlePlaceOrder}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -751,18 +759,18 @@ export default function CheckoutPage() {
           <div className="lg:col-span-2 space-y-6">
             {/* Contact Information */}
             <Card className="p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6">Contact Information</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">{t('checkout.contactInformation')}</h2>
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input
-                    label="First Name"
+                    label={t('checkout.form.firstName')}
                     type="text"
                     {...register('firstName')}
                     error={errors.firstName?.message}
                     disabled={isSubmitting}
                   />
                   <Input
-                    label="Last Name"
+                    label={t('checkout.form.lastName')}
                     type="text"
                     {...register('lastName')}
                     error={errors.lastName?.message}
@@ -771,16 +779,16 @@ export default function CheckoutPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input
-                    label="Email"
+                    label={t('checkout.form.email')}
                     type="email"
                     {...register('email')}
                     error={errors.email?.message}
                     disabled={isSubmitting}
                   />
                   <Input
-                    label="Phone"
+                    label={t('checkout.form.phone')}
                     type="tel"
-                    placeholder="+374XXXXXXXX"
+                    placeholder={t('checkout.placeholders.phone')}
                     {...register('phone')}
                     error={errors.phone?.message}
                     disabled={isSubmitting}
@@ -791,7 +799,7 @@ export default function CheckoutPage() {
 
             {/* Shipping Method */}
             <Card className="p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6">Shipping Method</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">{t('checkout.shippingMethod')}</h2>
               {errors.shippingMethod && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-sm text-red-600">{errors.shippingMethod.message}</p>
@@ -815,8 +823,8 @@ export default function CheckoutPage() {
                     disabled={isSubmitting}
                   />
                   <div className="flex-1">
-                    <div className="font-medium text-gray-900">Store Pickup</div>
-                    <div className="text-sm text-gray-600">Pick up your order from our store (Free)</div>
+                    <div className="font-medium text-gray-900">{t('checkout.shipping.storePickup')}</div>
+                    <div className="text-sm text-gray-600">{t('checkout.shipping.storePickupDescription')}</div>
                   </div>
                 </label>
                 <label
@@ -836,8 +844,8 @@ export default function CheckoutPage() {
                     disabled={isSubmitting}
                   />
                   <div className="flex-1">
-                    <div className="font-medium text-gray-900">Delivery</div>
-                    <div className="text-sm text-gray-600">We'll deliver your order to your address</div>
+                    <div className="font-medium text-gray-900">{t('checkout.shipping.delivery')}</div>
+                    <div className="text-sm text-gray-600">{t('checkout.shipping.deliveryDescription')}</div>
                   </div>
                 </label>
               </div>
@@ -846,7 +854,7 @@ export default function CheckoutPage() {
             {/* Shipping Address - Only show for delivery */}
             {shippingMethod === 'delivery' && (
               <Card className="p-6" data-shipping-section>
-                <h2 className="text-xl font-semibold text-gray-900 mb-6">Shipping Address</h2>
+                <h2 className="text-xl font-semibold text-gray-900 mb-6">{t('checkout.shippingAddress')}</h2>
                 {(error && error.includes('shipping address')) || (errors.shippingAddress || errors.shippingCity || errors.shippingPostalCode || errors.shippingPhone) ? (
                   <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                     <p className="text-sm text-red-600">
@@ -862,9 +870,9 @@ export default function CheckoutPage() {
                 <div className="space-y-4">
                   <div>
                     <Input
-                      label="Address"
+                      label={t('checkout.form.address')}
                       type="text"
-                      placeholder="Street address, apartment, suite, etc."
+                      placeholder={t('checkout.placeholders.address')}
                       {...register('shippingAddress', {
                         onChange: () => {
                           if (error && error.includes('shipping address')) {
@@ -879,9 +887,9 @@ export default function CheckoutPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Input
-                        label="City"
+                        label={t('checkout.form.city')}
                         type="text"
-                        placeholder="City"
+                        placeholder={t('checkout.placeholders.city')}
                         {...register('shippingCity', {
                           onChange: () => {
                             if (error && error.includes('shipping address')) {
@@ -895,9 +903,9 @@ export default function CheckoutPage() {
                     </div>
                     <div>
                       <Input
-                        label="Postal Code"
+                        label={t('checkout.form.postalCode')}
                         type="text"
-                        placeholder="Postal code"
+                        placeholder={t('checkout.placeholders.postalCode')}
                         {...register('shippingPostalCode', {
                           onChange: () => {
                             if (error && error.includes('shipping address')) {
@@ -912,9 +920,9 @@ export default function CheckoutPage() {
                   </div>
                   <div>
                     <Input
-                      label="Phone Number"
+                      label={t('checkout.form.phoneNumber')}
                       type="tel"
-                      placeholder="+374XXXXXXXX"
+                      placeholder={t('checkout.placeholders.phone')}
                       {...register('shippingPhone', {
                         onChange: () => {
                           if (error && error.includes('shipping address')) {
@@ -932,7 +940,7 @@ export default function CheckoutPage() {
 
             {/* Payment Method */}
             <Card className="p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6">Payment Method</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">{t('checkout.paymentMethod')}</h2>
               {errors.paymentMethod && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-sm text-red-600">{errors.paymentMethod.message}</p>
@@ -989,31 +997,31 @@ export default function CheckoutPage() {
           {/* Order Summary */}
           <div>
             <Card className="p-6 sticky top-4">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6">Order Summary</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">{t('checkout.orderSummary')}</h2>
               <div className="space-y-4 mb-6">
                 <div className="flex justify-between text-gray-600">
-                  <span>Subtotal</span>
+                  <span>{t('checkout.summary.subtotal')}</span>
                   <span>{formatPrice(cart.totals.subtotal, currency)}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
-                  <span>Shipping</span>
+                  <span>{t('checkout.summary.shipping')}</span>
                   <span>
                     {shippingMethod === 'pickup' 
-                      ? 'Free (Pickup)' 
+                      ? t('checkout.shipping.freePickup')
                       : loadingDeliveryPrice
-                        ? 'Loading...'
+                        ? t('checkout.shipping.loading')
                         : deliveryPrice !== null
-                          ? formatPrice(deliveryPrice, currency) + (shippingCity ? ` (${shippingCity})` : ' (Delivery)')
-                          : 'Enter city'}
+                          ? formatPrice(deliveryPrice, currency) + (shippingCity ? ` (${shippingCity})` : ` (${t('checkout.shipping.delivery')})`)
+                          : t('checkout.shipping.enterCity')}
                   </span>
                 </div>
                 <div className="flex justify-between text-gray-600">
-                  <span>Tax</span>
+                  <span>{t('checkout.summary.tax')}</span>
                   <span>{formatPrice(cart.totals.tax, currency)}</span>
                 </div>
                 <div className="border-t border-gray-200 pt-4">
                   <div className="flex justify-between text-lg font-bold text-gray-900">
-                    <span>Total</span>
+                    <span>{t('checkout.summary.total')}</span>
                     <span>
                       {formatPrice(
                         cart.totals.subtotal + 
@@ -1039,7 +1047,7 @@ export default function CheckoutPage() {
                 size="lg"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'Processing...' : 'Place Order'}
+                {isSubmitting ? t('checkout.buttons.processing') : t('checkout.buttons.placeOrder')}
               </Button>
             </Card>
           </div>
@@ -1065,12 +1073,12 @@ export default function CheckoutPage() {
           >
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-900">
-                {shippingMethod === 'delivery' ? 'Complete Your Order' : 'Confirm Order'}
+                {shippingMethod === 'delivery' ? t('checkout.modals.completeOrder') : t('checkout.modals.confirmOrder')}
               </h2>
               <button
                 onClick={() => setShowShippingModal(false)}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
-                aria-label="Close modal"
+                aria-label={t('checkout.modals.closeModal')}
               >
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -1080,10 +1088,10 @@ export default function CheckoutPage() {
 
             {/* Contact Information */}
             <div className="space-y-4 mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">Contact Information</h3>
+              <h3 className="text-lg font-semibold text-gray-900">{t('checkout.contactInformation')}</h3>
               <div>
                 <Input
-                  label="Email"
+                  label={t('checkout.form.email')}
                   type="email"
                   {...register('email')}
                   error={errors.email?.message}
@@ -1092,9 +1100,9 @@ export default function CheckoutPage() {
               </div>
               <div>
                 <Input
-                  label="Phone"
+                  label={t('checkout.form.phone')}
                   type="tel"
-                  placeholder="+374XXXXXXXX"
+                  placeholder={t('checkout.placeholders.phone')}
                   {...register('phone')}
                   error={errors.phone?.message}
                   disabled={isSubmitting}
@@ -1114,12 +1122,12 @@ export default function CheckoutPage() {
             {shippingMethod === 'delivery' ? (
               <>
                 <div className="space-y-4 mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900">Shipping Address</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">{t('checkout.shippingAddress')}</h3>
                   <div>
                     <Input
-                      label="Address"
+                      label={t('checkout.form.address')}
                       type="text"
-                      placeholder="Street address, apartment, suite, etc."
+                      placeholder={t('checkout.placeholders.address')}
                       {...register('shippingAddress')}
                       error={errors.shippingAddress?.message}
                       disabled={isSubmitting}
@@ -1128,9 +1136,9 @@ export default function CheckoutPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Input
-                        label="City"
+                        label={t('checkout.form.city')}
                         type="text"
-                        placeholder="City"
+                        placeholder={t('checkout.placeholders.city')}
                         {...register('shippingCity')}
                         error={errors.shippingCity?.message}
                         disabled={isSubmitting}
@@ -1138,9 +1146,9 @@ export default function CheckoutPage() {
                     </div>
                     <div>
                       <Input
-                        label="Postal Code"
+                        label={t('checkout.form.postalCode')}
                         type="text"
-                        placeholder="Postal code"
+                        placeholder={t('checkout.placeholders.postalCode')}
                         {...register('shippingPostalCode')}
                         error={errors.shippingPostalCode?.message}
                         disabled={isSubmitting}
@@ -1149,9 +1157,9 @@ export default function CheckoutPage() {
                   </div>
                   <div>
                     <Input
-                      label="Phone Number"
+                      label={t('checkout.form.phoneNumber')}
                       type="tel"
-                      placeholder="+374XXXXXXXX"
+                      placeholder={t('checkout.placeholders.phone')}
                       {...register('shippingPhone')}
                       error={errors.shippingPhone?.message}
                       disabled={isSubmitting}
@@ -1174,13 +1182,13 @@ export default function CheckoutPage() {
                 {(paymentMethod === 'arca' || paymentMethod === 'idram') && (
                   <div className="space-y-4 mb-6 mt-6">
                     <h3 className="text-lg font-semibold text-gray-900">
-                      Payment Details ({paymentMethod === 'idram' ? 'Idram' : 'ArCa'})
+                      {t('checkout.payment.paymentDetails')} ({paymentMethod === 'idram' ? t('checkout.payment.idram') : t('checkout.payment.arca')})
                     </h3>
                     <div>
                     <Input
-                      label="Card Number"
+                      label={t('checkout.form.cardNumber')}
                       type="text"
-                      placeholder="1234 5678 9012 3456"
+                      placeholder={t('checkout.placeholders.cardNumber')}
                       maxLength={19}
                       {...register('cardNumber')}
                       error={errors.cardNumber?.message}
@@ -1195,9 +1203,9 @@ export default function CheckoutPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Input
-                        label="Expiry Date"
+                        label={t('checkout.form.expiryDate')}
                         type="text"
-                        placeholder="MM/YY"
+                        placeholder={t('checkout.placeholders.expiryDate')}
                         maxLength={5}
                         {...register('cardExpiry')}
                         error={errors.cardExpiry?.message}
@@ -1213,9 +1221,9 @@ export default function CheckoutPage() {
                     </div>
                     <div>
                       <Input
-                        label="CVV"
+                        label={t('checkout.form.cvv')}
                         type="text"
-                        placeholder="123"
+                        placeholder={t('checkout.placeholders.cvv')}
                         maxLength={4}
                         {...register('cardCvv')}
                         error={errors.cardCvv?.message}
@@ -1229,9 +1237,9 @@ export default function CheckoutPage() {
                   </div>
                   <div>
                     <Input
-                      label="Card Holder Name"
+                      label={t('checkout.form.cardHolderName')}
                       type="text"
-                      placeholder="John Doe"
+                      placeholder={t('checkout.placeholders.cardHolderName')}
                       {...register('cardHolderName')}
                       error={errors.cardHolderName?.message}
                       disabled={isSubmitting}
@@ -1244,7 +1252,7 @@ export default function CheckoutPage() {
                 {paymentMethod === 'cash_on_delivery' && (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 mt-6">
                     <p className="text-sm text-green-800">
-                      <strong>Cash on Delivery:</strong> You will pay with cash when you receive your order. No card details required.
+                      <strong>{t('checkout.payment.cashOnDelivery')}:</strong> {t('checkout.messages.cashOnDeliveryInfo')}
                     </p>
                   </div>
                 )}
@@ -1252,26 +1260,26 @@ export default function CheckoutPage() {
                 {cart && (
                   <div className="bg-gray-50 rounded-lg p-4 space-y-2 mt-4">
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Items:</span>
+                      <span className="text-gray-600">{t('checkout.summary.items')}:</span>
                       <span className="font-medium">{cart.itemsCount}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Subtotal:</span>
+                      <span className="text-gray-600">{t('checkout.summary.subtotal')}:</span>
                       <span className="font-medium">{formatPrice(cart.totals.subtotal, currency)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Shipping:</span>
+                      <span className="text-gray-600">{t('checkout.summary.shipping')}:</span>
                       <span className="font-medium">
                         {loadingDeliveryPrice
-                          ? 'Loading...'
+                          ? t('checkout.shipping.loading')
                           : deliveryPrice !== null
-                            ? formatPrice(deliveryPrice, currency) + (shippingCity ? ` (${shippingCity})` : ' (Delivery)')
-                            : shippingMethod === 'delivery' ? 'Enter city' : 'Free (Pickup)'}
+                            ? formatPrice(deliveryPrice, currency) + (shippingCity ? ` (${shippingCity})` : ` (${t('checkout.shipping.delivery')})`)
+                            : shippingMethod === 'delivery' ? t('checkout.shipping.enterCity') : t('checkout.shipping.freePickup')}
                       </span>
                     </div>
                     <div className="border-t border-gray-200 pt-2 mt-2">
                       <div className="flex justify-between">
-                        <span className="font-semibold text-gray-900">Total:</span>
+                        <span className="font-semibold text-gray-900">{t('checkout.summary.total')}:</span>
                         <span className="font-bold text-gray-900">
                           {formatPrice(
                             cart.totals.subtotal + 
@@ -1289,7 +1297,7 @@ export default function CheckoutPage() {
               <div className="mb-6">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                   <p className="text-sm text-blue-800">
-                    <strong>Store Pickup:</strong> You will pick up your order from our store. Shipping is free.
+                    <strong>{t('checkout.shipping.storePickup')}:</strong> {t('checkout.messages.storePickupInfo')}
                   </p>
                 </div>
 
@@ -1297,13 +1305,13 @@ export default function CheckoutPage() {
                 {(paymentMethod === 'arca' || paymentMethod === 'idram') && (
                   <div className="space-y-4 mb-6">
                     <h3 className="text-lg font-semibold text-gray-900">
-                      Payment Details ({paymentMethod === 'idram' ? 'Idram' : 'ArCa'})
+                      {t('checkout.payment.paymentDetails')} ({paymentMethod === 'idram' ? t('checkout.payment.idram') : t('checkout.payment.arca')})
                     </h3>
                     <div>
                       <Input
-                        label="Card Number"
+                        label={t('checkout.form.cardNumber')}
                         type="text"
-                        placeholder="1234 5678 9012 3456"
+                        placeholder={t('checkout.placeholders.cardNumber')}
                         maxLength={19}
                         {...register('cardNumber')}
                         error={errors.cardNumber?.message}
@@ -1318,9 +1326,9 @@ export default function CheckoutPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Input
-                          label="Expiry Date"
+                          label={t('checkout.form.expiryDate')}
                           type="text"
-                          placeholder="MM/YY"
+                          placeholder={t('checkout.placeholders.expiryDate')}
                           maxLength={5}
                           {...register('cardExpiry')}
                           error={errors.cardExpiry?.message}
@@ -1336,9 +1344,9 @@ export default function CheckoutPage() {
                       </div>
                       <div>
                         <Input
-                          label="CVV"
+                          label={t('checkout.form.cvv')}
                           type="text"
-                          placeholder="123"
+                          placeholder={t('checkout.placeholders.cvv')}
                           maxLength={4}
                           {...register('cardCvv')}
                           error={errors.cardCvv?.message}
@@ -1352,9 +1360,9 @@ export default function CheckoutPage() {
                     </div>
                     <div>
                       <Input
-                        label="Card Holder Name"
+                        label={t('checkout.form.cardHolderName')}
                         type="text"
-                        placeholder="John Doe"
+                        placeholder={t('checkout.placeholders.cardHolderName')}
                         {...register('cardHolderName')}
                         error={errors.cardHolderName?.message}
                         disabled={isSubmitting}
@@ -1367,7 +1375,7 @@ export default function CheckoutPage() {
                 {paymentMethod === 'cash_on_delivery' && (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
                     <p className="text-sm text-green-800">
-                      <strong>Cash on Delivery:</strong> You will pay with cash when you pick up your order. No card details required.
+                      <strong>{t('checkout.payment.cashOnDelivery')}:</strong> {t('checkout.messages.cashOnDeliveryPickup')}
                     </p>
                   </div>
                 )}
@@ -1375,20 +1383,20 @@ export default function CheckoutPage() {
                 {cart && (
                   <div className="bg-gray-50 rounded-lg p-4 space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Items:</span>
+                      <span className="text-gray-600">{t('checkout.summary.items')}:</span>
                       <span className="font-medium">{cart.itemsCount}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Subtotal:</span>
+                      <span className="text-gray-600">{t('checkout.summary.subtotal')}:</span>
                       <span className="font-medium">{formatPrice(cart.totals.subtotal, currency)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Shipping:</span>
-                      <span className="font-medium">Free (Pickup)</span>
+                      <span className="text-gray-600">{t('checkout.summary.shipping')}:</span>
+                      <span className="font-medium">{t('checkout.shipping.freePickup')}</span>
                     </div>
                     <div className="border-t border-gray-200 pt-2 mt-2">
                       <div className="flex justify-between">
-                        <span className="font-semibold text-gray-900">Total:</span>
+                        <span className="font-semibold text-gray-900">{t('checkout.summary.total')}:</span>
                         <span className="font-bold text-gray-900">
                           {formatPrice(cart.totals.subtotal + cart.totals.tax, currency)}
                         </span>
@@ -1407,7 +1415,7 @@ export default function CheckoutPage() {
                 onClick={() => setShowShippingModal(false)}
                 disabled={isSubmitting}
               >
-                Cancel
+                {t('checkout.buttons.cancel')}
               </Button>
               <Button
                 type="button"
@@ -1432,7 +1440,7 @@ export default function CheckoutPage() {
                 )}
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'Processing...' : 'Place Order'}
+                {isSubmitting ? t('checkout.buttons.processing') : t('checkout.buttons.placeOrder')}
               </Button>
             </div>
           </div>
@@ -1458,12 +1466,12 @@ export default function CheckoutPage() {
           >
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-900">
-                {paymentMethod === 'arca' ? 'ArCa' : 'Idram'} Card Details
+                {t('checkout.modals.cardDetails').replace('{method}', paymentMethod === 'arca' ? t('checkout.payment.arca') : t('checkout.payment.idram'))}
               </h2>
               <button
                 onClick={() => setShowCardModal(false)}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
-                aria-label="Close modal"
+                aria-label={t('checkout.modals.closeModal')}
               >
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -1493,17 +1501,17 @@ export default function CheckoutPage() {
                 </div>
                 <div>
                   <div className="font-semibold text-gray-900">
-                    {paymentMethod === 'arca' ? 'ArCa' : 'Idram'} Payment
+                    {paymentMethod === 'arca' ? t('checkout.payment.arca') : t('checkout.payment.idram')} {t('checkout.payment.paymentDetails')}
                   </div>
-                  <div className="text-sm text-gray-600">Enter your card details to complete the payment</div>
+                  <div className="text-sm text-gray-600">{t('checkout.payment.enterCardDetails')}</div>
                 </div>
               </div>
 
               <div>
                 <Input
-                  label="Card Number"
+                  label={t('checkout.form.cardNumber')}
                   type="text"
-                  placeholder="1234 5678 9012 3456"
+                  placeholder={t('checkout.placeholders.cardNumber')}
                   maxLength={19}
                   {...register('cardNumber')}
                   error={errors.cardNumber?.message}
@@ -1518,9 +1526,9 @@ export default function CheckoutPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Input
-                    label="Expiry Date"
+                    label={t('checkout.form.expiryDate')}
                     type="text"
-                    placeholder="MM/YY"
+                    placeholder={t('checkout.placeholders.expiryDate')}
                     maxLength={5}
                     {...register('cardExpiry')}
                     error={errors.cardExpiry?.message}
@@ -1536,9 +1544,9 @@ export default function CheckoutPage() {
                 </div>
                 <div>
                   <Input
-                    label="CVV"
+                    label={t('checkout.form.cvv')}
                     type="text"
-                    placeholder="123"
+                    placeholder={t('checkout.placeholders.cvv')}
                     maxLength={4}
                     {...register('cardCvv')}
                     error={errors.cardCvv?.message}
@@ -1552,9 +1560,9 @@ export default function CheckoutPage() {
               </div>
               <div>
                 <Input
-                  label="Card Holder Name"
+                  label={t('checkout.form.cardHolderName')}
                   type="text"
-                  placeholder="John Doe"
+                  placeholder={t('checkout.placeholders.cardHolderName')}
                   {...register('cardHolderName')}
                   error={errors.cardHolderName?.message}
                   disabled={isSubmitting}
@@ -1577,34 +1585,34 @@ export default function CheckoutPage() {
             {/* Order Summary */}
             {cart && (
               <div className="bg-gray-50 rounded-lg p-4 space-y-2 mb-6">
-                <h3 className="font-semibold text-gray-900 mb-3">Order Summary</h3>
+                <h3 className="font-semibold text-gray-900 mb-3">{t('checkout.orderSummary')}</h3>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Items:</span>
+                  <span className="text-gray-600">{t('checkout.summary.items')}:</span>
                   <span className="font-medium">{cart.itemsCount}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Subtotal:</span>
+                  <span className="text-gray-600">{t('checkout.summary.subtotal')}:</span>
                   <span className="font-medium">{formatPrice(cart.totals.subtotal, currency)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Shipping:</span>
+                  <span className="text-gray-600">{t('checkout.summary.shipping')}:</span>
                   <span className="font-medium">
                     {shippingMethod === 'pickup' 
-                      ? 'Free (Pickup)' 
+                      ? t('checkout.shipping.freePickup')
                       : loadingDeliveryPrice
-                        ? 'Loading...'
+                        ? t('checkout.shipping.loading')
                         : deliveryPrice !== null
-                          ? formatPrice(deliveryPrice, currency) + (shippingCity ? ` (${shippingCity})` : ' (Delivery)')
-                          : 'Enter city'}
+                          ? formatPrice(deliveryPrice, currency) + (shippingCity ? ` (${shippingCity})` : ` (${t('checkout.shipping.delivery')})`)
+                          : t('checkout.shipping.enterCity')}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Tax:</span>
+                  <span className="text-gray-600">{t('checkout.summary.tax')}:</span>
                   <span className="font-medium">{formatPrice(cart.totals.tax, currency)}</span>
                 </div>
                 <div className="border-t border-gray-200 pt-2 mt-2">
                   <div className="flex justify-between">
-                    <span className="font-semibold text-gray-900">Total:</span>
+                    <span className="font-semibold text-gray-900">{t('checkout.summary.total')}:</span>
                     <span className="font-bold text-gray-900">
                       {formatPrice(
                         cart.totals.subtotal + 
@@ -1626,7 +1634,7 @@ export default function CheckoutPage() {
                 onClick={() => setShowCardModal(false)}
                 disabled={isSubmitting}
               >
-                Cancel
+                {t('checkout.buttons.cancel')}
               </Button>
               <Button
                 type="button"
@@ -1656,7 +1664,7 @@ export default function CheckoutPage() {
                 )}
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'Processing...' : 'Continue to Payment'}
+                {isSubmitting ? t('checkout.buttons.processing') : t('checkout.buttons.continueToPayment')}
               </Button>
             </div>
           </div>

@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
 import { apiClient } from '../../lib/api-client';
 import { formatPrice, getStoredCurrency } from '../../lib/currency';
+import { getStoredLanguage } from '../../lib/language';
 import { useTranslation } from '../../lib/i18n';
 import { useAuth } from '../../lib/auth/AuthContext';
 
@@ -131,7 +132,10 @@ export default function ComparePage() {
     };
 
     const handleLanguageUpdate = () => {
-      setLanguage(getStoredLanguage());
+      // Reload products with new language preference
+      // Get current IDs from localStorage to avoid dependency on state
+      const currentIds = getCompare();
+      fetchCompareProducts(currentIds);
     };
 
     window.addEventListener('currency-updated', handleCurrencyUpdate);
@@ -140,7 +144,7 @@ export default function ComparePage() {
       window.removeEventListener('currency-updated', handleCurrencyUpdate);
       window.removeEventListener('language-updated', handleLanguageUpdate);
     };
-  }, []);
+  }, [fetchCompareProducts]);
 
   const handleRemove = (e: MouseEvent, productId: string) => {
     e.preventDefault();
