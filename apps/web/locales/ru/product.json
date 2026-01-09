@@ -22,7 +22,8 @@
   "compareListFull": "Список сравнения заполнен",
   "errorAddingToCart": "Ошибка при добавлении в корзину",
   "pcs": "шт",
-  "outOfStockLabel": "Нет в наличии"
+  "outOfStockLabel": "Нет в наличии",
+  "noRelatedProducts": "Похожие товары не найдены"
 }
 
 

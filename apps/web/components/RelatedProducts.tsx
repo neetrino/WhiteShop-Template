@@ -363,7 +363,7 @@ export function RelatedProducts({ categorySlug, currentProductId }: RelatedProdu
   return (
     <section className="py-12 mt-20 border-t border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="text-3xl font-bold text-gray-900 mb-10">Related products</h2>
+        <h2 className="text-3xl font-bold text-gray-900 mb-10">{t(language, 'product.related_products_title')}</h2>
         
         {loading ? (
           // Loading state
@@ -379,7 +379,7 @@ export function RelatedProducts({ categorySlug, currentProductId }: RelatedProdu
         ) : products.length === 0 ? (
           // Empty state
           <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">No related products found</p>
+            <p className="text-gray-500 text-lg">{t(language, 'product.noRelatedProducts')}</p>
           </div>
         ) : (
           // Products Carousel

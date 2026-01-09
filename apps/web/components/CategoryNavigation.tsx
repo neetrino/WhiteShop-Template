@@ -8,6 +8,7 @@ import Image from 'next/image';
 import { apiClient } from '../lib/api-client';
 import { getStoredLanguage } from '../lib/language';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useTranslation } from '../lib/i18n-client';
 
 interface Category {
   id: string;
@@ -52,7 +53,12 @@ function flattenCategories(cats: Category[]): Category[] {
 /**
  * Get category icon based on title/slug
  */
-function getCategoryIcon(categoryTitle: string, categorySlug: string, isActive: boolean): ReactNode {
+function getCategoryIcon(
+  categoryTitle: string,
+  categorySlug: string,
+  isActive: boolean,
+  t: (path: string) => string
+): ReactNode {
   const title = categoryTitle.toLowerCase();
   const slug = categorySlug.toLowerCase();
 
@@ -62,7 +68,7 @@ function getCategoryIcon(categoryTitle: string, categorySlug: string, isActive: 
       <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center transition-all ${
         isActive ? 'bg-gray-300' : 'bg-gray-200'
       }`}>
-        <span className="text-xs sm:text-sm font-bold text-gray-900">ALL</span>
+        <span className="text-xs sm:text-sm font-bold text-gray-900">{t('products.categoryNavigation.labels.all')}</span>
       </div>
     );
   }
@@ -73,7 +79,7 @@ function getCategoryIcon(categoryTitle: string, categorySlug: string, isActive: 
       <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center transition-all ${
         isActive ? 'bg-green-200' : 'bg-green-100'
       }`}>
-        <span className="text-xs sm:text-sm font-bold text-green-700">NEW</span>
+        <span className="text-xs sm:text-sm font-bold text-green-700">{t('products.categoryNavigation.labels.new')}</span>
       </div>
     );
   }
@@ -84,7 +90,7 @@ function getCategoryIcon(categoryTitle: string, categorySlug: string, isActive: 
       <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center transition-all ${
         isActive ? 'bg-red-200' : 'bg-red-100'
       }`}>
-        <span className="text-xs sm:text-sm font-bold text-red-700">SALE</span>
+        <span className="text-xs sm:text-sm font-bold text-red-700">{t('products.categoryNavigation.labels.sale')}</span>
       </div>
     );
   }
@@ -100,6 +106,7 @@ function getCategoryIcon(categoryTitle: string, categorySlug: string, isActive: 
 function CategoryNavigationContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useTranslation();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [categoryProducts, setCategoryProducts] = useState<Record<string, Product | null>>({});
@@ -132,7 +139,7 @@ function CategoryNavigationContent() {
       
       // Add "All" category
       const allCategoriesWithAll = [
-        { id: 'all', slug: 'all', title: 'All', fullPath: 'all', children: [] } as Category,
+        { id: 'all', slug: 'all', title: t('products.categoryNavigation.all'), fullPath: 'all', children: [] } as Category,
         ...allCategories
       ];
 
@@ -264,7 +271,7 @@ function CategoryNavigationContent() {
 
   // Add "All" category at the beginning
   const allCategoriesWithAll = [
-    { id: 'all', slug: 'all', title: 'All', fullPath: 'all', children: [] } as Category,
+    { id: 'all', slug: 'all', title: t('products.categoryNavigation.all'), fullPath: 'all', children: [] } as Category,
     ...categories
   ];
 
@@ -316,7 +323,7 @@ function CategoryNavigationContent() {
                 ? 'text-gray-900 hover:scale-110 cursor-pointer' 
                 : 'text-gray-300 cursor-not-allowed opacity-50'
             }`}
-            aria-label="Scroll categories left"
+            aria-label={t('products.categoryNavigation.scrollLeft')}
           >
             <ChevronLeft className="w-6 h-6" />
           </button>
@@ -336,11 +343,11 @@ function CategoryNavigationContent() {
             // Determine label text
             let labelText = title;
             if (slug === 'all') {
-              labelText = 'Shop All';
+              labelText = t('products.categoryNavigation.shopAll');
             } else if (title.toLowerCase().includes('new')) {
-              labelText = 'New Arrivals';
+              labelText = t('products.categoryNavigation.newArrivals');
             } else if (title.toLowerCase().includes('sale')) {
-              labelText = 'Sale';
+              labelText = t('products.categoryNavigation.sale');
             }
 
             return (
@@ -356,7 +363,7 @@ function CategoryNavigationContent() {
                 {/* Category Icon/Image */}
                 <div className="relative">
                   {(slug === 'all' || title.toLowerCase().includes('new') || title.toLowerCase().includes('sale')) ? (
-                    getCategoryIcon(title, slug, isActive)
+                    getCategoryIcon(title, slug, isActive, t)
                   ) : (
                     <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white border-2 flex items-center justify-center overflow-hidden transition-all ${
                       isActive ? 'border-gray-400 shadow-md' : 'border-gray-200'
@@ -410,7 +417,7 @@ function CategoryNavigationContent() {
                 ? 'text-gray-900 hover:scale-110 cursor-pointer' 
                 : 'text-gray-300 cursor-not-allowed opacity-50'
             }`}
-            aria-label="Scroll categories right"
+            aria-label={t('products.categoryNavigation.scrollRight')}
           >
             <ChevronRight className="w-6 h-6" />
           </button>

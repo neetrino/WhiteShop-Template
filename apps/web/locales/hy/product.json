@@ -22,7 +22,8 @@
   "compareListFull": "Համեմատման ցուցակը լի է",
   "errorAddingToCart": "Սխալ ավելացնելիս",
   "pcs": "հատ",
-  "outOfStockLabel": "Արտադրված"
+  "outOfStockLabel": "Արտադրված",
+  "noRelatedProducts": "Նմանատիպ ապրանքներ չգտնվեցին"
 }
 
 

@@ -6,6 +6,7 @@ import { Card } from '@shop/ui';
 import { apiClient } from '../lib/api-client';
 import { getStoredLanguage } from '../lib/language';
 import { getStoredCurrency, formatPrice as formatCurrencyPrice, type CurrencyCode } from '../lib/currency';
+import { useTranslation } from '../lib/i18n-client';
 
 interface PriceFilterProps {
   currentMinPrice?: string;
@@ -24,6 +25,7 @@ interface PriceRange {
 export function PriceFilter({ currentMinPrice, currentMaxPrice, category }: PriceFilterProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useTranslation();
   const [priceRange, setPriceRange] = useState<PriceRange>({
     min: 0,
     max: 100000,
@@ -217,7 +219,7 @@ export function PriceFilter({ currentMinPrice, currentMaxPrice, category }: Pric
 
   return (
     <Card className="p-4 mb-6">
-      <h3 className="text-base font-bold text-gray-800 mb-4 text-center uppercase tracking-wide">Filter By Price</h3>
+      <h3 className="text-base font-bold text-gray-800 mb-4 text-center uppercase tracking-wide">{t('products.filters.price.title')}</h3>
       
       {/* Range Slider */}
       <div className="mb-4">
@@ -293,7 +295,7 @@ export function PriceFilter({ currentMinPrice, currentMaxPrice, category }: Pric
 
       {/* Price Display */}
       <div className="text-gray-700 text-center">
-        <span className="text-sm text-gray-500">Price: </span>
+        <span className="text-sm text-gray-500">{t('products.filters.price.priceLabel')} </span>
         <span className="text-sm font-semibold text-gray-900">
           {formatPrice(Number(safeMinPrice) || 0)} - {formatPrice(Number(safeMaxPrice) || 100000)}
         </span>

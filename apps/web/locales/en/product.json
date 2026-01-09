@@ -22,7 +22,8 @@
   "compareListFull": "Compare list is full",
   "errorAddingToCart": "Error adding to cart",
   "pcs": "pcs",
-  "outOfStockLabel": "Out of Stock"
+  "outOfStockLabel": "Out of Stock",
+  "noRelatedProducts": "No related products found"
 }
 
 

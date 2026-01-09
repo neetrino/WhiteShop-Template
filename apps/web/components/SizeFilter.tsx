@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Card } from '@shop/ui';
 import { apiClient } from '../lib/api-client';
 import { getStoredLanguage } from '../lib/language';
+import { useTranslation } from '../lib/i18n-client';
 
 interface SizeFilterProps {
   category?: string;
@@ -23,6 +24,7 @@ interface SizeOption {
 export function SizeFilter({ category, search, minPrice, maxPrice, selectedSizes = [] }: SizeFilterProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useTranslation();
   const [sizes, setSizes] = useState<SizeOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string[]>(selectedSizes);
@@ -91,18 +93,18 @@ export function SizeFilter({ category, search, minPrice, maxPrice, selectedSizes
   if (loading) {
     return (
       <Card className="p-4 mb-6">
-        <h3 className="text-base font-bold text-gray-800 mb-4 uppercase tracking-wide">Filter By Size</h3>
-        <div className="text-sm text-gray-500">Loading...</div>
+        <h3 className="text-base font-bold text-gray-800 mb-4 uppercase tracking-wide">{t('products.filters.size.title')}</h3>
+        <div className="text-sm text-gray-500">{t('products.filters.size.loading')}</div>
       </Card>
     );
   }
 
   return (
     <Card className="p-4 mb-6">
-      <h3 className="text-base font-bold text-gray-800 mb-4 uppercase tracking-wide">Filter By Size</h3>
+      <h3 className="text-base font-bold text-gray-800 mb-4 uppercase tracking-wide">{t('products.filters.size.title')}</h3>
       {sizes.length === 0 ? (
         <div className="text-sm text-gray-500 py-4 text-center">
-          No sizes available
+          {t('products.filters.size.noSizes')}
         </div>
       ) : (
         <div className="space-y-2">

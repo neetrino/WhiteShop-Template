@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, Input } from '@shop/ui';
 import { apiClient } from '../lib/api-client';
 import { getStoredLanguage } from '../lib/language';
+import { useTranslation } from '../lib/i18n-client';
 
 interface BrandFilterProps {
   category?: string;
@@ -41,6 +42,7 @@ interface ProductsResponse {
 export function BrandFilter({ category, search, minPrice, maxPrice, selectedBrands = [] }: BrandFilterProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useTranslation();
   const [brands, setBrands] = useState<BrandOption[]>([]);
   const [filteredBrands, setFilteredBrands] = useState<BrandOption[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -147,8 +149,8 @@ export function BrandFilter({ category, search, minPrice, maxPrice, selectedBran
   if (loading) {
     return (
       <Card className="p-4 mb-6">
-        <h3 className="text-base font-bold text-gray-800 mb-4 uppercase tracking-wide">Filter By Brand</h3>
-        <div className="text-sm text-gray-500">Loading...</div>
+        <h3 className="text-base font-bold text-gray-800 mb-4 uppercase tracking-wide">{t('products.filters.brand.title')}</h3>
+        <div className="text-sm text-gray-500">{t('products.filters.brand.loading')}</div>
       </Card>
     );
   }
@@ -159,13 +161,13 @@ export function BrandFilter({ category, search, minPrice, maxPrice, selectedBran
 
   return (
     <Card className="p-4 mb-6">
-      <h3 className="text-base font-bold text-gray-800 mb-4 uppercase tracking-wide">Filter By Brand</h3>
+      <h3 className="text-base font-bold text-gray-800 mb-4 uppercase tracking-wide">{t('products.filters.brand.title')}</h3>
       
       {/* Search Input */}
       <div className="mb-4 relative">
         <Input
           type="text"
-          placeholder="Find a Brand"
+          placeholder={t('products.filters.brand.searchPlaceholder')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full pr-10"
@@ -225,7 +227,7 @@ export function BrandFilter({ category, search, minPrice, maxPrice, selectedBran
         </div>
       ) : (
         <div className="text-sm text-gray-500 py-4 text-center">
-          No brands found
+          {t('products.filters.brand.noBrands')}
         </div>
       )}
     </Card>

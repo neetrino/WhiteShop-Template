@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ProductCard } from './ProductCard';
+import { useTranslation } from '../lib/i18n-client';
 
 interface Product {
   id: string;
@@ -25,6 +26,7 @@ interface ProductsGridProps {
 }
 
 export function ProductsGrid({ products, sortBy = 'default' }: ProductsGridProps) {
+  const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<ViewMode>('grid-2');
   const [sortedProducts, setSortedProducts] = useState<Product[]>(products);
 
@@ -94,7 +96,7 @@ export function ProductsGrid({ products, sortBy = 'default' }: ProductsGridProps
   if (sortedProducts.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500 text-lg">No products found.</p>
+        <p className="text-gray-500 text-lg">{t('products.grid.noProducts')}</p>
       </div>
     );
   }

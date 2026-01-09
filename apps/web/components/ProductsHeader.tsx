@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useRef, Suspense } from 'react';
+import { useTranslation } from '../lib/i18n-client';
 
 type ViewMode = 'list' | 'grid-2' | 'grid-3';
 type SortOption = 'default' | 'price-asc' | 'price-desc' | 'name-asc' | 'name-desc';
@@ -17,22 +18,23 @@ interface ProductsHeaderProps {
   perPage: number;
 }
 
-const sortOptions: { value: SortOption; label: string }[] = [
-  { value: 'default', label: 'Default sorting' },
-  { value: 'price-asc', label: 'Price: Low to High' },
-  { value: 'price-desc', label: 'Price: High to Low' },
-  { value: 'name-asc', label: 'Name: A to Z' },
-  { value: 'name-desc', label: 'Name: Z to A' },
-];
-
 function ProductsHeaderContent({ total, perPage }: ProductsHeaderProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<ViewMode>('grid-2');
   const [sortBy, setSortBy] = useState<SortOption>('default');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const sortDropdownRef = useRef<HTMLDivElement>(null);
   const mobileSortDropdownRef = useRef<HTMLDivElement>(null);
+
+  const sortOptions: { value: SortOption; label: string }[] = [
+    { value: 'default', label: t('products.header.sort.default') },
+    { value: 'price-asc', label: t('products.header.sort.priceAsc') },
+    { value: 'price-desc', label: t('products.header.sort.priceDesc') },
+    { value: 'name-asc', label: t('products.header.sort.nameAsc') },
+    { value: 'name-desc', label: t('products.header.sort.nameDesc') },
+  ];
 
   // Derive current "show per page" value from URL or fallback to "all" (default)
   const limitFromUrl = searchParams.get('limit');
@@ -169,12 +171,12 @@ function ProductsHeaderContent({ total, perPage }: ProductsHeaderProps) {
                   strokeLinejoin="round"
                 />
               </svg>
-              <span>Clear filters</span>
+              <span>{t('products.header.clearFilters')}</span>
             </button>
           )}
           
           <h1 className="text-xl font-bold text-gray-900">
-            All products ({total})
+            {t('products.header.allProducts').replace('{total}', total.toString())}
           </h1>
         </div>
 
@@ -182,13 +184,13 @@ function ProductsHeaderContent({ total, perPage }: ProductsHeaderProps) {
         <div className="flex items-center gap-4">
           {/* Show dropdown */}
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-900">Show</span>
+            <span className="text-sm text-gray-900">{t('products.header.show')}</span>
             <select
               value={currentLimit === 'all' ? 'all' : currentLimit}
               onChange={(event) => handleLimitChange(event.target.value)}
               className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-200 min-w-[70px]"
             >
-              <option value="all">All</option>
+              <option value="all">{t('products.header.all')}</option>
               <option value="10">10</option>
               <option value="20">20</option>
               <option value="50">50</option>
@@ -206,7 +208,7 @@ function ProductsHeaderContent({ total, perPage }: ProductsHeaderProps) {
                   ? 'bg-gray-100 text-gray-900'
                   : 'text-gray-400 hover:text-gray-600'
               }`}
-              aria-label="List view"
+              aria-label={t('products.header.viewModes.list')}
             >
               <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <line x1="3" y1="5" x2="17" y2="5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -223,7 +225,7 @@ function ProductsHeaderContent({ total, perPage }: ProductsHeaderProps) {
                   ? 'bg-gray-100 text-gray-900'
                   : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
               }`}
-              aria-label="Grid view 2x2"
+              aria-label={t('products.header.viewModes.grid2')}
             >
               <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <rect x="2" y="2" width="7" height="7" stroke="currentColor" strokeWidth="1.5" fill={viewMode === 'grid-2' ? 'currentColor' : 'none'} />
@@ -241,7 +243,7 @@ function ProductsHeaderContent({ total, perPage }: ProductsHeaderProps) {
                   ? 'bg-gray-100 text-gray-900'
                   : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
               }`}
-              aria-label="Grid view 3x3"
+              aria-label={t('products.header.viewModes.grid3')}
             >
               <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="4" cy="4" r="1.5" fill="currentColor" />
@@ -263,7 +265,7 @@ function ProductsHeaderContent({ total, perPage }: ProductsHeaderProps) {
               onClick={() => setShowSortDropdown(!showSortDropdown)}
               className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-colors text-sm text-gray-900 min-w-[160px]"
             >
-              <span>{sortOptions.find(opt => opt.value === sortBy)?.label || 'Default sorting'}</span>
+              <span>{sortOptions.find(opt => opt.value === sortBy)?.label || t('products.header.sort.default')}</span>
               <svg
                 width="12"
                 height="12"
@@ -302,18 +304,18 @@ function ProductsHeaderContent({ total, perPage }: ProductsHeaderProps) {
         {/* Top: All Products Title + Show dropdown */}
         <div className="flex items-center justify-between">
           <h1 className="text-lg font-bold text-gray-900">
-            All products ({total})
+            {t('products.header.allProducts').replace('{total}', total.toString())}
           </h1>
           
           {/* Show dropdown - Top right */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-600">Show</span>
+            <span className="text-xs text-gray-600">{t('products.header.show')}</span>
             <select
               value={currentLimit === 'all' ? 'all' : currentLimit}
               onChange={(event) => handleLimitChange(event.target.value)}
               className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-200"
             >
-              <option value="all">All</option>
+              <option value="all">{t('products.header.all')}</option>
               <option value="10">10</option>
               <option value="20">20</option>
               <option value="50">50</option>
@@ -341,7 +343,7 @@ function ProductsHeaderContent({ total, perPage }: ProductsHeaderProps) {
               <line x1="3" y1="10" x2="17" y2="10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               <line x1="3" y1="15" x2="17" y2="15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
-            <span>Filters</span>
+            <span>{t('products.header.filters')}</span>
           </button>
 
           {/* Right: View Mode Icons + Sort */}
@@ -355,7 +357,7 @@ function ProductsHeaderContent({ total, perPage }: ProductsHeaderProps) {
                     ? 'bg-gray-100 text-gray-900'
                     : 'text-gray-400 hover:text-gray-600'
                 }`}
-                aria-label="List view"
+                aria-label={t('products.header.viewModes.list')}
               >
                 <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <line x1="3" y1="5" x2="17" y2="5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -370,7 +372,7 @@ function ProductsHeaderContent({ total, perPage }: ProductsHeaderProps) {
                     ? 'bg-gray-100 text-gray-900'
                     : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
                 }`}
-                aria-label="Grid view 2x2"
+                aria-label={t('products.header.viewModes.grid2')}
               >
                 <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <rect x="2" y="2" width="7" height="7" stroke="currentColor" strokeWidth="1.5" fill={viewMode === 'grid-2' ? 'currentColor' : 'none'} />
@@ -386,7 +388,7 @@ function ProductsHeaderContent({ total, perPage }: ProductsHeaderProps) {
               <button
                 onClick={() => setShowSortDropdown(!showSortDropdown)}
                 className="flex items-center justify-center w-10 h-10 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-colors text-gray-700"
-                aria-label="Sort products"
+                aria-label={t('products.header.sortProducts')}
               >
                 <svg
                   width="16"

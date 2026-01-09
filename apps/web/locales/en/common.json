@@ -29,6 +29,8 @@
     "about": "About Us",
     "contact": "Contact",
     "admin": "Admin",
+    "adminPanel": "Admin Panel",
+    "logout": "Logout",
     "faq": "FAQ",
     "shipping": "Shipping",
     "returns": "Returns",

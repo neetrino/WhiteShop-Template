@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
+import { useTranslation } from '../lib/i18n-client';
 
 interface MobileFiltersDrawerProps {
   title?: string;
@@ -14,11 +15,14 @@ interface MobileFiltersDrawerProps {
  * Mobile filters drawer that կարող է բացվել թե՛ կոճակից, թե՛ արտաքին իրադարձությունից։
  */
 export function MobileFiltersDrawer({
-  title = 'Filters',
-  triggerLabel = 'Filters',
+  title,
+  triggerLabel,
   children,
   openEventName,
 }: MobileFiltersDrawerProps) {
+  const { t } = useTranslation();
+  const defaultTitle = title || t('products.mobileFilters.title');
+  const defaultTriggerLabel = triggerLabel || t('products.mobileFilters.title');
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -60,12 +64,12 @@ export function MobileFiltersDrawer({
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
-              <p className="text-lg font-semibold text-gray-900">{title}</p>
+              <p className="text-lg font-semibold text-gray-900">{defaultTitle}</p>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
                 className="h-10 w-10 rounded-full border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-900"
-                aria-label="Close filters"
+                aria-label={t('products.mobileFilters.close')}
               >
                 <svg className="mx-auto h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
