@@ -2104,7 +2104,9 @@ function AddProductPageContent() {
         brandId: finalBrandIds.length > 0 ? finalBrandIds[0] : undefined,
         primaryCategoryId: finalPrimaryCategoryId || undefined,
         categoryIds: formData.categoryIds.length > 0 ? formData.categoryIds : undefined,
-        published: formData.published,
+        // При создании нового продукта автоматически публикуем его
+        // При редактировании используем значение из формы
+        published: isEditMode ? formData.published : true,
         featured: formData.featured,
         locale: 'en',
         variants: variants,
