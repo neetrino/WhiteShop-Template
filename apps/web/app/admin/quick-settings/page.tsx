@@ -69,20 +69,60 @@ export default function QuickSettingsPage() {
     try {
       console.log('📦 [QUICK SETTINGS] Fetching products...');
       setProductsLoading(true);
-      const response = await apiClient.get<{ data: any[] }>('/api/v1/admin/products', {
-        params: { limit: '1000' }, // Get all products
+      
+      // Սկզբում բեռնում ենք առաջին էջը limit=100-ով (առավելագույն արժեք)
+      const firstPageResponse = await apiClient.get<{ 
+        data: any[]; 
+        meta?: { totalPages: number; total: number } 
+      }>('/api/v1/admin/products', {
+        params: { page: '1', limit: '100' },
       });
-      if (response?.data && Array.isArray(response.data)) {
-        setProducts(response.data);
-        // Initialize product discounts from API data
+      
+      let allProducts: any[] = [];
+      
+      if (firstPageResponse?.data && Array.isArray(firstPageResponse.data)) {
+        allProducts = [...firstPageResponse.data];
+        console.log('📦 [QUICK SETTINGS] First page loaded:', firstPageResponse.data.length);
+        
+        // Եթե կան ավելի շատ էջեր, բեռնում ենք մնացածները
+        const totalPages = firstPageResponse.meta?.totalPages || 1;
+        if (totalPages > 1) {
+          console.log(`📦 [QUICK SETTINGS] Loading ${totalPages - 1} more pages...`);
+          
+          // Ստեղծում ենք բոլոր էջերի հարցումները
+          const pagePromises: Promise<{ data: any[] }>[] = [];
+          for (let page = 2; page <= totalPages; page++) {
+            pagePromises.push(
+              apiClient.get<{ data: any[] }>('/api/v1/admin/products', {
+                params: { page: page.toString(), limit: '100' },
+              })
+            );
+          }
+          
+          // Բեռնում ենք բոլոր էջերը զուգահեռ
+          const remainingPages = await Promise.all(pagePromises);
+          remainingPages.forEach((pageResponse, index) => {
+            if (pageResponse?.data && Array.isArray(pageResponse.data)) {
+              allProducts = [...allProducts, ...pageResponse.data];
+              console.log(`📦 [QUICK SETTINGS] Page ${index + 2} loaded:`, pageResponse.data.length);
+            }
+          });
+        }
+        
+        // Սահմանում ենք բոլոր ապրանքները
+        setProducts(allProducts);
+        
+        // Նախաձեռնում ենք ապրանքների զեղչերը API տվյալներից
         const discounts: Record<string, number> = {};
-        response.data.forEach((product: any) => {
+        allProducts.forEach((product: any) => {
           discounts[product.id] = product.discountPercent || 0;
         });
         setProductDiscounts(discounts);
-        console.log('✅ [QUICK SETTINGS] Products loaded:', response.data.length);
+        
+        console.log('✅ [QUICK SETTINGS] All products loaded:', allProducts.length);
       } else {
         setProducts([]);
+        console.warn('⚠️ [QUICK SETTINGS] No products data received');
       }
     } catch (err: any) {
       console.error('❌ [QUICK SETTINGS] Error fetching products:', err);
