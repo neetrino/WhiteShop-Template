@@ -816,45 +816,65 @@ function AddProductPageContent() {
       return;
     }
 
-    // Create one variant per attribute
-    const variants = selectedAttrs.map((attributeId) => {
-      const attribute = attributes.find(a => a.id === attributeId);
-      if (!attribute) return null;
+    // Preserve existing variants' data (price, stock, etc.) when regenerating
+    setGeneratedVariants(prev => {
+      const existingVariantsMap = new Map(prev.map(v => [v.id, v]));
       
-      const selectedValueIds = selectedAttributeValueIds[attributeId] || [];
-      
-      // Generate SKU based on attribute and selected values
-      const baseSlug = formData.slug || generateSlug(formData.title) || 'PROD';
-      const attributeKey = attribute.key.toUpperCase();
-      let sku = `${baseSlug}-${attributeKey}`;
-      
-      // If values are selected, add them to SKU
-      if (selectedValueIds.length > 0) {
-        const valueParts = selectedValueIds.map(valueId => {
-          const value = attribute.values.find(v => v.id === valueId);
-          return value ? value.value.toUpperCase().replace(/\s+/g, '-') : '';
-        }).filter(Boolean);
-        if (valueParts.length > 0) {
-          sku = `${baseSlug}-${valueParts.join('-')}`;
+      // Create one variant per attribute
+      const variants = selectedAttrs.map((attributeId) => {
+        const attribute = attributes.find(a => a.id === attributeId);
+        if (!attribute) return null;
+        
+        // Get selected value IDs for this attribute from state
+        const selectedValueIdsForAttribute = selectedAttributeValueIds[attributeId] || [];
+        
+        // Get existing variant if it exists
+        const existingVariant = existingVariantsMap.get(attributeId);
+        
+        // Preserve all selectedValueIds from existing variant (includes values from other attributes)
+        // Merge with newly selected values for this attribute
+        const existingSelectedValueIds = existingVariant?.selectedValueIds || [];
+        const otherAttributeValueIds = existingSelectedValueIds.filter(id => {
+          // Keep values that don't belong to this attribute
+          return !attribute.values.some(v => v.id === id);
+        });
+        // Merge: other attributes' values + this attribute's selected values
+        const allSelectedValueIds = [...new Set([...otherAttributeValueIds, ...selectedValueIdsForAttribute])];
+        
+        // Generate SKU based on attribute and selected values
+        const baseSlug = formData.slug || generateSlug(formData.title) || 'PROD';
+        const attributeKey = attribute.key.toUpperCase();
+        let sku = `${baseSlug}-${attributeKey}`;
+        
+        // If values are selected for this attribute, add them to SKU
+        if (selectedValueIdsForAttribute.length > 0) {
+          const valueParts = selectedValueIdsForAttribute.map(valueId => {
+            const value = attribute.values.find(v => v.id === valueId);
+            return value ? value.value.toUpperCase().replace(/\s+/g, '-') : '';
+          }).filter(Boolean);
+          if (valueParts.length > 0) {
+            sku = `${baseSlug}-${valueParts.join('-')}`;
+          }
         }
-      }
 
-      return {
-        id: attributeId, // Use attributeId as variant ID
-        attributeId: attribute.id,
-        attributeKey: attribute.key,
-        attributeName: attribute.name,
-        selectedValueIds: selectedValueIds, // All selected values for this attribute
-        price: '',
-        compareAtPrice: '',
-        stock: '',
-        sku,
-        image: null,
-      };
-    }).filter((v): v is NonNullable<typeof v> => v !== null);
+        return {
+          id: attributeId, // Use attributeId as variant ID
+          attributeId: attribute.id,
+          attributeKey: attribute.key,
+          attributeName: attribute.name,
+          selectedValueIds: allSelectedValueIds, // All selected values (from all attributes)
+          price: existingVariant?.price || '',
+          compareAtPrice: existingVariant?.compareAtPrice || '',
+          stock: existingVariant?.stock || '',
+          sku: existingVariant?.sku || sku, // Preserve existing SKU if set, otherwise use generated
+          image: existingVariant?.image || null,
+        };
+      }).filter((v): v is NonNullable<typeof v> => v !== null);
 
-    setGeneratedVariants(variants);
-    console.log('✅ [VARIANT BUILDER] Variants generated (one per attribute):', variants.length);
+      return variants;
+    });
+    
+    console.log('✅ [VARIANT BUILDER] Variants generated (one per attribute):', selectedAttrs.length);
   };
 
   // Update variants when attributes or values change
@@ -3324,16 +3344,16 @@ function AddProductPageContent() {
                                                               newIds = currentIds.filter(id => id !== value.id);
                                                             }
                                                             
-                                                            // Update selectedAttributeValueIds
+                                                            // Update variant first (to preserve dropdown state)
+                                                            setGeneratedVariants(prev => prev.map(v => 
+                                                              v.id === variant.id ? { ...v, selectedValueIds: newIds } : v
+                                                            ));
+                                                            
+                                                            // Then update selectedAttributeValueIds (this will trigger useEffect but variant is already updated)
                                                             setSelectedAttributeValueIds(prev => ({
                                                               ...prev,
                                                               [attributeId]: newIds,
                                                             }));
-                                                            
-                                                            // Update variant
-                                                            setGeneratedVariants(prev => prev.map(v => 
-                                                              v.id === variant.id ? { ...v, selectedValueIds: newIds } : v
-                                                            ));
                                                           }}
                                                           className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                                                         />
@@ -3504,15 +3524,16 @@ function AddProductPageContent() {
                                                             newAttrIds = currentAttrIds.filter(id => id !== value.id);
                                                           }
                                                           
+                                                          // Update variant first (to preserve dropdown state)
+                                                          setGeneratedVariants(prev => prev.map(v => 
+                                                            v.id === variant.id ? { ...v, selectedValueIds: newIds } : v
+                                                          ));
+                                                          
+                                                          // Then update selectedAttributeValueIds (this will trigger useEffect but variant is already updated)
                                                           setSelectedAttributeValueIds(prev => ({
                                                             ...prev,
                                                             [attributeId]: newAttrIds,
                                                           }));
-                                                          
-                                                          // Update variant
-                                                          setGeneratedVariants(prev => prev.map(v => 
-                                                            v.id === variant.id ? { ...v, selectedValueIds: newIds } : v
-                                                          ));
                                                         }}
                                                         className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                                                       />
