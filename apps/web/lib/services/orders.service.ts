@@ -439,6 +439,7 @@ class OrdersService {
                     attributeValue: {
                       include: {
                         attribute: true,
+                        translations: true,
                       },
                     },
                   },
@@ -514,6 +515,12 @@ class OrdersService {
           valueId: string | null;
           attributeValue: {
             value: string;
+            imageUrl: string | null;
+            colors: any;
+            translations: Array<{
+              locale: string;
+              label: string;
+            }>;
             attribute: {
               key: string;
             };
@@ -528,14 +535,23 @@ class OrdersService {
             attributeValueData: opt.attributeValue ? {
               value: opt.attributeValue.value,
               attributeKey: opt.attributeValue.attribute.key,
+              imageUrl: opt.attributeValue.imageUrl,
+              hasTranslations: opt.attributeValue.translations?.length > 0,
             } : null,
           });
 
           // New format: Use AttributeValue if available
           if (opt.attributeValue) {
+            // Get label from translations (prefer current locale, fallback to first available)
+            const translations = opt.attributeValue.translations || [];
+            const label = translations.length > 0 ? translations[0].label : opt.attributeValue.value;
+            
             return {
               attributeKey: opt.attributeValue.attribute.key || undefined,
               value: opt.attributeValue.value || undefined,
+              label: label || undefined,
+              imageUrl: opt.attributeValue.imageUrl || undefined,
+              colors: opt.attributeValue.colors || undefined,
             };
           }
           // Old format: Use attributeKey and value directly

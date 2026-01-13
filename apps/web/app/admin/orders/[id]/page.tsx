@@ -49,6 +49,9 @@ interface OrderDetails {
     variantOptions?: Array<{
       attributeKey?: string;
       value?: string;
+      label?: string;
+      imageUrl?: string;
+      colors?: string[] | any;
     }>;
   }>;
   createdAt: string;
@@ -317,40 +320,67 @@ export default function OrderDetailsPage() {
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white">
                       {order.items.map((item) => {
-                        // Extract color and size from variant options (case-insensitive matching)
-                        const colorOption = item.variantOptions?.find(opt => {
-                          const key = opt.attributeKey?.toLowerCase()?.trim();
-                          return key === 'color' || key === 'colour';
-                        });
-                        const sizeOption = item.variantOptions?.find(opt => {
-                          const key = opt.attributeKey?.toLowerCase()?.trim();
-                          return key === 'size';
-                        });
-                        const color = colorOption?.value;
-                        const size = sizeOption?.value;
+                        // Get all variant options (not just color and size)
+                        const allOptions = item.variantOptions || [];
+                        
+                        // Helper to check if colors array is valid
+                        const getColorsArray = (colors: any): string[] => {
+                          if (!colors) return [];
+                          if (Array.isArray(colors)) return colors;
+                          if (typeof colors === 'string') {
+                            try {
+                              const parsed = JSON.parse(colors);
+                              return Array.isArray(parsed) ? parsed : [];
+                            } catch {
+                              return [];
+                            }
+                          }
+                          return [];
+                        };
 
                         return (
                           <tr key={item.id}>
                             <td className="px-3 py-2">{item.productTitle}</td>
                             <td className="px-3 py-2 text-gray-500">{item.sku}</td>
                             <td className="px-3 py-2">
-                              {(color || size) ? (
+                              {allOptions.length > 0 ? (
                                 <div className="flex flex-wrap gap-2 items-center">
-                                  {color && (
-                                    <div className="flex items-center gap-1.5">
-                                      <div 
-                                        className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0"
-                                        style={{ 
-                                          backgroundColor: getColorValue(color),
-                                        }}
-                                        title={color}
-                                      />
-                                      <span className="text-xs text-gray-700 capitalize">{color}</span>
-                                    </div>
-                                  )}
-                                  {size && (
-                                    <span className="text-xs text-gray-700 uppercase">{size}</span>
-                                  )}
+                                  {allOptions.map((opt, optIndex) => {
+                                    if (!opt.attributeKey || !opt.value) return null;
+                                    
+                                    const attributeKey = opt.attributeKey.toLowerCase().trim();
+                                    const isColor = attributeKey === 'color' || attributeKey === 'colour';
+                                    const displayLabel = opt.label || opt.value;
+                                    const hasImage = opt.imageUrl && opt.imageUrl.trim() !== '';
+                                    const colors = getColorsArray(opt.colors);
+                                    const colorHex = colors.length > 0 ? colors[0] : (isColor ? getColorValue(opt.value) : null);
+                                    
+                                    return (
+                                      <div key={optIndex} className="flex items-center gap-1.5">
+                                        {/* Show image if available */}
+                                        {hasImage ? (
+                                          <img 
+                                            src={opt.imageUrl!} 
+                                            alt={displayLabel}
+                                            className="w-4 h-4 rounded border border-gray-300 object-cover flex-shrink-0"
+                                            onError={(e) => {
+                                              // Fallback to color circle if image fails to load
+                                              (e.target as HTMLImageElement).style.display = 'none';
+                                            }}
+                                          />
+                                        ) : isColor && colorHex ? (
+                                          <div 
+                                            className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0"
+                                            style={{ backgroundColor: colorHex }}
+                                            title={displayLabel}
+                                          />
+                                        ) : null}
+                                        <span className="text-xs text-gray-700 capitalize">
+                                          {displayLabel}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               ) : (
                                 <span className="text-xs text-gray-400">—</span>

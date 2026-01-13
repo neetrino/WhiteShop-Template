@@ -52,6 +52,9 @@ interface OrderItem {
   variantOptions?: Array<{
     attributeKey?: string;
     value?: string;
+    label?: string;
+    imageUrl?: string;
+    colors?: string[] | any;
   }>;
 }
 
@@ -225,24 +228,31 @@ export default function OrderPage() {
                   variantOptionsCount: item.variantOptions?.length || 0,
                 });
 
-                // Extract color and size from variant options (case-insensitive matching)
-                const colorOption = item.variantOptions?.find(opt => {
-                  const key = opt.attributeKey?.toLowerCase()?.trim();
-                  return key === 'color' || key === 'colour';
-                });
-                const sizeOption = item.variantOptions?.find(opt => {
-                  const key = opt.attributeKey?.toLowerCase()?.trim();
-                  return key === 'size';
-                });
-                const color = colorOption?.value;
-                const size = sizeOption?.value;
+                // Get all variant options (not just color and size)
+                const allOptions = item.variantOptions || [];
+                
+                // Helper to get attribute label (capitalize first letter)
+                const getAttributeLabel = (key: string): string => {
+                  if (key === 'color' || key === 'colour') return t('orders.itemDetails.color');
+                  if (key === 'size') return t('orders.itemDetails.size');
+                  // Capitalize first letter for other attributes
+                  return key.charAt(0).toUpperCase() + key.slice(1);
+                };
 
-                console.log(`🎨 [ORDER PAGE] Item ${index} extracted:`, {
-                  colorOption,
-                  sizeOption,
-                  color,
-                  size,
-                });
+                // Helper to check if colors array is valid
+                const getColorsArray = (colors: any): string[] => {
+                  if (!colors) return [];
+                  if (Array.isArray(colors)) return colors;
+                  if (typeof colors === 'string') {
+                    try {
+                      const parsed = JSON.parse(colors);
+                      return Array.isArray(parsed) ? parsed : [];
+                    } catch {
+                      return [];
+                    }
+                  }
+                  return [];
+                };
                 
                 return (
                   <div key={index} className="flex gap-4 pb-4 border-b border-gray-200 last:border-0">
@@ -258,30 +268,50 @@ export default function OrderPage() {
                     <div className="flex-1">
                       <h3 className="text-lg font-semibold text-gray-900 mb-1">{item.productTitle}</h3>
                       
-                      {/* Display variation options (color and size) */}
-                      {(color || size) && (
+                      {/* Display all variation options */}
+                      {allOptions.length > 0 && (
                         <div className="flex flex-wrap gap-3 mt-2 mb-2">
-                          {color && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-gray-700">{t('orders.itemDetails.color')}</span>
-                              <div className="flex items-center gap-2">
-                                <div 
-                                  className="w-5 h-5 rounded-full border border-gray-300"
-                                  style={{ 
-                                    backgroundColor: getColorValue(color),
-                                  }}
-                                  title={color}
-                                />
-                                <span className="text-sm text-gray-900 capitalize">{color}</span>
+                          {allOptions.map((opt, optIndex) => {
+                            if (!opt.attributeKey || !opt.value) return null;
+                            
+                            const attributeKey = opt.attributeKey.toLowerCase().trim();
+                            const isColor = attributeKey === 'color' || attributeKey === 'colour';
+                            const displayLabel = opt.label || opt.value;
+                            const hasImage = opt.imageUrl && opt.imageUrl.trim() !== '';
+                            const colors = getColorsArray(opt.colors);
+                            const colorHex = colors.length > 0 ? colors[0] : (isColor ? getColorValue(opt.value) : null);
+                            
+                            return (
+                              <div key={optIndex} className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-gray-700">
+                                  {getAttributeLabel(opt.attributeKey)}:
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  {/* Show image if available */}
+                                  {hasImage ? (
+                                    <img 
+                                      src={opt.imageUrl!} 
+                                      alt={displayLabel}
+                                      className="w-6 h-6 rounded border border-gray-300 object-cover"
+                                      onError={(e) => {
+                                        // Fallback to color circle if image fails to load
+                                        (e.target as HTMLImageElement).style.display = 'none';
+                                      }}
+                                    />
+                                  ) : isColor && colorHex ? (
+                                    <div 
+                                      className="w-5 h-5 rounded-full border border-gray-300"
+                                      style={{ backgroundColor: colorHex }}
+                                      title={displayLabel}
+                                    />
+                                  ) : null}
+                                  <span className="text-sm text-gray-900 capitalize">
+                                    {displayLabel}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                          )}
-                          {size && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-gray-700">{t('orders.itemDetails.size')}</span>
-                              <span className="text-sm text-gray-900 uppercase">{size}</span>
-                            </div>
-                          )}
+                            );
+                          })}
                         </div>
                       )}
                       
