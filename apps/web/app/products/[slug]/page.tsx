@@ -181,6 +181,7 @@ export default function ProductPage({ params }: ProductPageProps) {
     if (!product) return [];
     
     // First, collect all attribute value imageUrls to exclude them from product images
+    // Attribute value images should NOT appear in the main gallery
     const attributeValueImageUrls = new Set<string>();
     if (product.productAttributes && Array.isArray(product.productAttributes)) {
       product.productAttributes.forEach((productAttr) => {
@@ -203,24 +204,36 @@ export default function ProductPage({ params }: ProductPageProps) {
       });
     }
     
+    // Helper to check if a URL matches any attribute value image
+    const isAttributeValueImage = (url: string): boolean => {
+      const processed = processImageUrl(url);
+      if (!processed) return false;
+      
+      const normalized = processed.startsWith('/') ? processed : `/${processed}`;
+      const withoutSlash = processed.startsWith('/') ? processed.substring(1) : processed;
+      
+      return attributeValueImageUrls.has(processed) || 
+             attributeValueImageUrls.has(normalized) || 
+             attributeValueImageUrls.has(withoutSlash);
+    };
+    
     const allRawImages: any[] = [];
     // 1. Add general product media first
     if (product.media) allRawImages.push(...product.media);
     
-    // 2. Add all variant images (but filter out attribute value images)
+    // 2. Add variant images, but EXCLUDE those that match attribute value images
+    // Variant images that are the same as attribute value images should NOT appear in gallery
     if (product.variants) {
       product.variants.forEach(v => {
         if (v.imageUrl) {
           const split = smartSplitUrls(v.imageUrl);
           split.forEach((url: string) => {
-            const processed = processImageUrl(url);
-            if (processed) {
-              // Check if this image is an attribute value image
-              const isAttributeImage = attributeValueImageUrls.has(processed) || 
-                                     attributeValueImageUrls.has(processed.startsWith('/') ? processed.substring(1) : `/${processed}`);
-              if (!isAttributeImage) {
-                allRawImages.push(url);
-              }
+            // Only add variant image if it's NOT an attribute value image
+            // This ensures attribute value images don't appear in the main gallery
+            if (!isAttributeValueImage(url)) {
+              allRawImages.push(url);
+            } else {
+              console.log('🚫 [PRODUCT PAGE] Excluding variant image (matches attribute value image):', url);
             }
           });
         }
@@ -231,16 +244,16 @@ export default function ProductPage({ params }: ProductPageProps) {
       .map(processImageUrl)
       .filter((url): url is string => url !== null);
     
-    // Filter out any attribute value images that might have been added
+    // Final filter: remove any attribute value images that might have been added
     const filteredImages = processedImages.filter(url => {
-      const normalized = url.startsWith('/') ? url : `/${url}`;
-      const withoutSlash = url.startsWith('/') ? url.substring(1) : url;
-      return !attributeValueImageUrls.has(url) && 
-             !attributeValueImageUrls.has(normalized) && 
-             !attributeValueImageUrls.has(withoutSlash);
+      if (isAttributeValueImage(url)) {
+        console.log('🚫 [PRODUCT PAGE] Filtering out attribute value image from gallery:', url);
+        return false;
+      }
+      return true;
     });
     
-    // Return all unique images (excluding attribute value images)
+    // Return all unique images (attribute value images are excluded)
     return Array.from(new Set(filteredImages));
   }, [product, processImageUrl, smartSplitUrls]);
 
@@ -468,9 +481,238 @@ export default function ProductPage({ params }: ProductPageProps) {
     return product.variants.find(v => v.stock > 0) || product.variants[0] || null;
   }, [product?.variants, getOptionValue]);
 
+  /**
+   * Find variant by all selected attributes (color, size, and other attributes)
+   * This function considers all selected attribute values to find the best matching variant
+   */
+  const findVariantByAllAttributes = useCallback((
+    color: string | null,
+    size: string | null,
+    otherAttributes: Map<string, string>
+  ): ProductVariant | null => {
+    if (!product?.variants || product.variants.length === 0) return null;
+    
+    const normalizedColor = color?.toLowerCase().trim();
+    const normalizedSize = size?.toLowerCase().trim();
+
+    // Build a map of all selected attributes (including color and size)
+    const allSelectedAttributes = new Map<string, string>();
+    if (normalizedColor) allSelectedAttributes.set('color', normalizedColor);
+    if (normalizedSize) allSelectedAttributes.set('size', normalizedSize);
+    otherAttributes.forEach((value, key) => {
+      if (key !== 'color' && key !== 'size') {
+        allSelectedAttributes.set(key, value.toLowerCase().trim());
+      }
+    });
+
+    // Helper to check if a variant matches all selected attributes
+    const variantMatches = (variant: ProductVariant): boolean => {
+      // Check color
+      if (normalizedColor) {
+        const vColor = getOptionValue(variant.options, 'color');
+        if (vColor !== normalizedColor) return false;
+      }
+
+      // Check size
+      if (normalizedSize) {
+        const vSize = getOptionValue(variant.options, 'size');
+        if (vSize !== normalizedSize) return false;
+      }
+
+      // Check other attributes
+      for (const [attrKey, attrValue] of otherAttributes.entries()) {
+        if (attrKey === 'color' || attrKey === 'size') continue;
+        
+        const variantValue = getOptionValue(variant.options, attrKey);
+        const normalizedAttrValue = attrValue.toLowerCase().trim();
+        
+        // Try matching by valueId first (if available)
+        const option = variant.options?.find(opt => 
+          opt.key === attrKey || opt.attribute === attrKey
+        );
+        
+        if (option) {
+          // Check by valueId if both have it
+          if (option.valueId && attrValue) {
+            // If the selected value is an ID, match by ID
+            if (option.valueId === attrValue) {
+              continue;
+            }
+          }
+          
+          // Fallback to value matching
+          if (variantValue !== normalizedAttrValue) {
+            return false;
+          }
+        } else {
+          return false;
+        }
+      }
+
+      return true;
+    };
+
+    // 1. Try to find exact match with all attributes
+    const exactMatch = product.variants.find(v => variantMatches(v) && v.imageUrl);
+    if (exactMatch) {
+      console.log('✅ [PRODUCT PAGE] Found exact variant match:', {
+        variantId: exactMatch.id,
+        attributes: Array.from(allSelectedAttributes.entries()),
+        hasImage: !!exactMatch.imageUrl
+      });
+      return exactMatch;
+    }
+
+    // 2. Try to find any match (even without image) with all attributes
+    const anyMatch = product.variants.find(v => variantMatches(v));
+    if (anyMatch) {
+      console.log('✅ [PRODUCT PAGE] Found variant match (no image):', {
+        variantId: anyMatch.id,
+        attributes: Array.from(allSelectedAttributes.entries())
+      });
+      return anyMatch;
+    }
+
+    // 3. Fallback: find by color and size only
+    if (normalizedColor || normalizedSize) {
+      return findVariantByColorAndSize(normalizedColor || null, normalizedSize || null);
+    }
+
+    // 4. Ultimate fallback
+    return product.variants.find(v => v.stock > 0) || product.variants[0] || null;
+  }, [product?.variants, getOptionValue, findVariantByColorAndSize]);
+
+  /**
+   * Switch to variant's image if it exists
+   * This function finds the variant's image in the images array and switches to it
+   * Note: If variant image matches an attribute value image, it won't be in the gallery,
+   * so we won't switch to it (attribute value images are excluded from gallery)
+   */
+  const switchToVariantImage = useCallback((variant: ProductVariant | null) => {
+    if (!variant || !variant.imageUrl || !product) {
+      console.log('⚠️ [PRODUCT PAGE] Cannot switch image - missing variant or imageUrl:', {
+        hasVariant: !!variant,
+        hasImageUrl: variant ? !!variant.imageUrl : false,
+        hasProduct: !!product
+      });
+      return;
+    }
+
+    console.log('🖼️ [PRODUCT PAGE] Switching to variant image:', {
+      variantId: variant.id,
+      imageUrl: variant.imageUrl,
+      imagesCount: images.length
+    });
+
+    const splitUrls = smartSplitUrls(variant.imageUrl);
+    if (splitUrls.length === 0) {
+      console.warn('⚠️ [PRODUCT PAGE] No URLs found in variant imageUrl');
+      return;
+    }
+
+    // Helper function to normalize URLs for comparison
+    const normalizeUrl = (url: string): string => {
+      let normalized = url.trim();
+      // Remove leading/trailing slashes for comparison
+      if (normalized.startsWith('/')) normalized = normalized.substring(1);
+      if (normalized.endsWith('/')) normalized = normalized.substring(0, normalized.length - 1);
+      return normalized.toLowerCase();
+    };
+
+    // Check if variant image is an attribute value image (these are excluded from gallery)
+    const isAttributeValueImage = (url: string): boolean => {
+      if (!product.productAttributes) return false;
+      
+      for (const productAttr of product.productAttributes) {
+        if (productAttr.attribute?.values) {
+          for (const val of productAttr.attribute.values) {
+            if (val.imageUrl) {
+              const attrProcessed = processImageUrl(val.imageUrl);
+              if (attrProcessed) {
+                const normalizedAttr = normalizeUrl(attrProcessed);
+                const normalizedVariant = normalizeUrl(url);
+                if (normalizedAttr === normalizedVariant) {
+                  return true;
+                }
+              }
+            }
+          }
+        }
+      }
+      return false;
+    };
+
+    // Try to find the first variant image in the images array
+    for (const url of splitUrls) {
+      const processedUrl = processImageUrl(url);
+      if (!processedUrl) {
+        console.log('⚠️ [PRODUCT PAGE] Failed to process URL:', url);
+        continue;
+      }
+
+      // If this variant image is an attribute value image, skip it
+      // (attribute value images are not in the gallery, so we can't switch to them)
+      if (isAttributeValueImage(processedUrl)) {
+        console.log('ℹ️ [PRODUCT PAGE] Variant image matches attribute value image (excluded from gallery):', processedUrl);
+        continue;
+      }
+
+      // Try multiple matching strategies
+      const imageIndex = images.findIndex(img => {
+        const normalizedImg = normalizeUrl(img);
+        const normalizedProcessed = normalizeUrl(processedUrl);
+        
+        // Exact match
+        if (normalizedImg === normalizedProcessed) return true;
+        
+        // Match with/without leading slash
+        if (normalizedImg === normalizedProcessed || 
+            `/${normalizedImg}` === `/${normalizedProcessed}` ||
+            normalizedImg === normalizedProcessed.substring(1) ||
+            normalizedImg.substring(1) === normalizedProcessed) {
+          return true;
+        }
+        
+        // Match by filename (for cases where paths differ)
+        const imgFilename = img.split('/').pop()?.toLowerCase();
+        const processedFilename = processedUrl.split('/').pop()?.toLowerCase();
+        if (imgFilename && processedFilename && imgFilename === processedFilename) {
+          return true;
+        }
+        
+        return false;
+      });
+
+      if (imageIndex !== -1) {
+        console.log('✅ [PRODUCT PAGE] Found variant image at index:', imageIndex, {
+          imageUrl: images[imageIndex],
+          variantImageUrl: processedUrl
+        });
+        setCurrentImageIndex(imageIndex);
+        
+        // Update thumbnail scroll if needed
+        if (imageIndex < thumbnailStartIndex || imageIndex >= thumbnailStartIndex + thumbnailsPerView) {
+          const newStart = Math.max(0, Math.min(images.length - thumbnailsPerView, imageIndex));
+          setThumbnailStartIndex(newStart);
+        }
+        return;
+      }
+    }
+
+    // If variant image not found in images array, log detailed info for debugging
+    console.log('ℹ️ [PRODUCT PAGE] Variant image not found in images array (may be excluded as attribute value image)', {
+      variantId: variant.id,
+      variantImageUrls: splitUrls,
+      processedUrls: splitUrls.map(processImageUrl).filter(Boolean),
+      availableImages: images.slice(0, 5), // Show first 5 for debugging
+      totalImages: images.length
+    });
+  }, [images, processImageUrl, smartSplitUrls, thumbnailStartIndex, thumbnailsPerView, product]);
+
   useEffect(() => {
     if (product && product.variants && product.variants.length > 0) {
-      const newVariant = findVariantByColorAndSize(selectedColor, selectedSize);
+      // Find variant considering all selected attributes (color, size, and others)
+      const newVariant = findVariantByAllAttributes(selectedColor, selectedSize, selectedAttributeValues);
       
       if (newVariant && newVariant.id !== selectedVariant?.id) {
         console.log('🔄 [PRODUCT PAGE] Variant changed:', {
@@ -478,11 +720,16 @@ export default function ProductPage({ params }: ProductPageProps) {
           to: newVariant.id,
           color: selectedColor,
           size: selectedSize,
+          otherAttributes: Array.from(selectedAttributeValues.entries()),
           price: newVariant.price,
           stock: newVariant.stock,
-          sku: newVariant.sku
+          sku: newVariant.sku,
+          hasImage: !!newVariant.imageUrl
         });
         setSelectedVariant(newVariant);
+        
+        // Switch to variant's image if it exists
+        switchToVariantImage(newVariant);
         
         // Synchronize selection states with the found variant (supports both formats)
         const colorValue = getOptionValue(newVariant.options, 'color');
@@ -494,9 +741,13 @@ export default function ProductPage({ params }: ProductPageProps) {
         if (sizeValue && sizeValue !== selectedSize?.toLowerCase().trim()) {
           setSelectedSize(sizeValue);
         }
+      } else if (newVariant && newVariant.id === selectedVariant?.id && newVariant.imageUrl) {
+        // Even if variant didn't change, check if we should switch to its image
+        // This handles cases where the same variant is selected but image wasn't shown
+        switchToVariantImage(newVariant);
       }
     }
-  }, [selectedColor, selectedSize, findVariantByColorAndSize, selectedVariant?.id, product]);
+  }, [selectedColor, selectedSize, selectedAttributeValues, findVariantByAllAttributes, switchToVariantImage, selectedVariant?.id, product, getOptionValue]);
 
   // Build attribute groups from productAttributes (new format) or from variants (old format)
   const attributeGroups = new Map<string, Array<{
@@ -862,32 +1113,7 @@ export default function ProductPage({ params }: ProductPageProps) {
       setSelectedColor(null);
     } else {
       setSelectedColor(color);
-      
-      // Find the first image associated with this color and jump to it
-      if (product?.variants) {
-        const variantWithImage = product.variants.find(v => {
-          const colorOpt = getOptionValue(v.options, 'color');
-          return colorOpt === color.toLowerCase().trim() && v.imageUrl;
-        });
-        
-        if (variantWithImage && variantWithImage.imageUrl) {
-          const firstColorImageUrl = smartSplitUrls(variantWithImage.imageUrl)[0];
-          const processedUrl = processImageUrl(firstColorImageUrl);
-          
-          if (processedUrl) {
-            const imageIndex = images.indexOf(processedUrl);
-            if (imageIndex !== -1) {
-              setCurrentImageIndex(imageIndex);
-              
-              // Also update thumbnail scroll if needed
-              if (imageIndex < thumbnailStartIndex || imageIndex >= thumbnailStartIndex + thumbnailsPerView) {
-                const newStart = Math.max(0, Math.min(images.length - thumbnailsPerView, imageIndex));
-                setThumbnailStartIndex(newStart);
-              }
-            }
-          }
-        }
-      }
+      // Image switching will be handled by the useEffect that watches selectedColor
     }
   };
 
