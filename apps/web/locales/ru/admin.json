@@ -363,6 +363,7 @@
       "attributesSelected": "{count} атрибутов выбрано",
       "selectAttributeValues": "Выбрать значения атрибутов",
       "noValuesAvailable": "Значения недоступны",
+      "valuesPlaceholder": "значения",
       "generatedVariants": "Сгенерированные варианты",
       "applyPriceToAll": "Применить цену ко всем",
       "applyStockToAll": "Применить запас ко всем",

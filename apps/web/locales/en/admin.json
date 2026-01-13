@@ -394,6 +394,7 @@
       "attributesSelected": "{count} attributes selected",
       "selectAttributeValues": "Select Attribute Values",
       "noValuesAvailable": "No values available",
+      "valuesPlaceholder": "values",
       "generatedVariants": "Generated Variants",
       "applyPriceToAll": "Apply Price to All",
       "applyStockToAll": "Apply Stock to All",
