@@ -3138,7 +3138,7 @@ function AddProductPageContent() {
                         </div>
                       </div>
 
-                      <div className="overflow-x-auto border border-gray-300 rounded-lg">
+                      <div className="border border-gray-300 rounded-lg" style={{ overflowX: 'auto', overflowY: 'visible' }}>
                         <table className="min-w-full divide-y divide-gray-200 bg-white">
                           <thead className="bg-gray-50">
                             <tr>
