@@ -185,6 +185,7 @@ function AddProductPageContent() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const colorImageFileInputRef = useRef<HTMLInputElement | null>(null);
   const mainProductImageInputRef = useRef<HTMLInputElement | null>(null);
+  const variantImageInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const attributesDropdownRef = useRef<HTMLDivElement | null>(null);
   const valueDropdownRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [attributesDropdownOpen, setAttributesDropdownOpen] = useState(false);
@@ -1447,6 +1448,40 @@ function AddProductPageContent() {
     }
   };
 
+  // Upload image for a specific variant
+  const handleUploadVariantImage = async (variantId: string, event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) {
+      return;
+    }
+
+    const file = files[0]; // Only take the first file
+    if (!file.type.startsWith('image/')) {
+      setImageUploadError(`"${file.name}" is not an image file`);
+      if (event.target) {
+        event.target.value = '';
+      }
+      return;
+    }
+
+    setImageUploadLoading(true);
+    setImageUploadError(null);
+    try {
+      const base64 = await fileToBase64(file);
+      setGeneratedVariants(prev => prev.map(v => 
+        v.id === variantId ? { ...v, image: base64 } : v
+      ));
+      console.log('✅ [VARIANT BUILDER] Variant image uploaded for variant:', variantId);
+    } catch (error: any) {
+      setImageUploadError(error?.message || t('admin.products.add.failedToProcessImage'));
+    } finally {
+      setImageUploadLoading(false);
+      if (event.target) {
+        event.target.value = '';
+      }
+    }
+  };
+
   // Upload images for a specific color in variant
   const handleUploadColorImages = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -1785,7 +1820,17 @@ function AddProductPageContent() {
             }
           });
           
+          // Add variant image if exists
+          if (variant.image) {
+            colorData.images.push(variant.image);
+          }
+          
           colors.push(colorData);
+        }
+        
+        // Add variant image to first color's images if variant has image
+        if (variant.image && colors.length > 0) {
+          colors[0].images.push(variant.image);
         }
         
         // Create variant
@@ -3117,6 +3162,9 @@ function AddProductPageContent() {
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 {t('admin.products.add.sku')}
                               </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {t('admin.products.add.image')}
+                              </th>
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
@@ -3359,6 +3407,55 @@ function AddProductPageContent() {
                                     placeholder="Auto-generated"
                                     className="w-32 text-sm"
                                   />
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <div className="flex items-center gap-2">
+                                    {variant.image ? (
+                                      <div className="relative inline-block">
+                                        <img
+                                          src={variant.image}
+                                          alt="Variant image"
+                                          className="w-16 h-16 object-cover border border-gray-300 rounded-md"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setGeneratedVariants(prev => prev.map(v => 
+                                              v.id === variant.id ? { ...v, image: null } : v
+                                            ));
+                                            if (variantImageInputRefs.current[variant.id]) {
+                                              variantImageInputRefs.current[variant.id]!.value = '';
+                                            }
+                                          }}
+                                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                                          title={t('admin.products.add.removeImage')}
+                                        >
+                                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                          </svg>
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => variantImageInputRefs.current[variant.id]?.click()}
+                                        disabled={imageUploadLoading}
+                                        className="px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        {imageUploadLoading ? t('admin.products.add.uploading') : t('admin.products.add.uploadImage')}
+                                      </button>
+                                    )}
+                                    <input
+                                      ref={(el) => { variantImageInputRefs.current[variant.id] = el; }}
+                                      type="file"
+                                      accept="image/*"
+                                      onChange={(e) => handleUploadVariantImage(variant.id, e)}
+                                      className="hidden"
+                                    />
+                                  </div>
                                 </td>
                               </tr>
                             ))}

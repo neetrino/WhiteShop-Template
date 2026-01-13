@@ -327,6 +327,7 @@
       "mainProductImageDescription": "This image will be used in product lists, cards, and single product page",
       "uploadMainProductImage": "Upload Main Product Image",
       "changeImage": "Change Image",
+      "uploadImage": "Upload Image",
       "uploading": "Uploading...",
       "backToAdmin": "Back to Admin Panel",
       "editProduct": "Edit Product",
