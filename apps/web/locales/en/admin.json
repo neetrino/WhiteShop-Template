@@ -176,7 +176,7 @@
     "updateCategory": "Update Category",
     "categoryTitle": "Category Title",
     "categoryTitlePlaceholder": "Enter category title",
-    "parentCategory": "Parent Category (Optional)",
+    "parentCategory": "Child Category",
     "rootCategory": "None (Root Category)",
     "requiresSizes": "This category requires sizes (e.g., clothing, shoes)",
     "titleRequired": "Please enter category title",
