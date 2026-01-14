@@ -26,8 +26,7 @@ export async function GET(
     }
 
     const { id } = await params;
-    const categories = await adminService.getCategories();
-    const category = categories.data.find((cat: any) => cat.id === id);
+    const category = await adminService.getCategoryById(id);
 
     if (!category) {
       return NextResponse.json(

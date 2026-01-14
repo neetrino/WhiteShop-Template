@@ -15,6 +15,7 @@ interface Category {
   title: string;
   parentId: string | null;
   requiresSizes?: boolean;
+  children?: Category[];
 }
 
 function CategoriesSection() {
@@ -28,6 +29,7 @@ function CategoriesSection() {
     title: '',
     parentId: '',
     requiresSizes: false,
+    subcategoryIds: [] as string[],
   });
   const [saving, setSaving] = useState(false);
 
@@ -106,7 +108,7 @@ function CategoriesSection() {
         locale: 'en',
       });
       setShowAddModal(false);
-      setFormData({ title: '', parentId: '', requiresSizes: false });
+      setFormData({ title: '', parentId: '', requiresSizes: false, subcategoryIds: [] });
       fetchCategories();
       alert(t('admin.categories.createdSuccess'));
     } catch (err: any) {
@@ -117,13 +119,30 @@ function CategoriesSection() {
     }
   };
 
-  const handleEditCategory = (category: Category) => {
+  const handleEditCategory = async (category: Category) => {
     setEditingCategory(category);
-    setFormData({
-      title: category.title,
-      parentId: category.parentId || '',
-      requiresSizes: category.requiresSizes || false,
-    });
+    
+    // Fetch category with children
+    try {
+      const response = await apiClient.get<{ data: Category }>(`/api/v1/admin/categories/${category.id}`);
+      const categoryWithChildren = response.data;
+      
+      setFormData({
+        title: category.title,
+        parentId: category.parentId || '',
+        requiresSizes: category.requiresSizes || false,
+        subcategoryIds: categoryWithChildren.children?.map(child => child.id) || [],
+      });
+    } catch (err) {
+      console.error('Error fetching category children:', err);
+      setFormData({
+        title: category.title,
+        parentId: category.parentId || '',
+        requiresSizes: category.requiresSizes || false,
+        subcategoryIds: [],
+      });
+    }
+    
     setShowEditModal(true);
   };
 
@@ -139,11 +158,12 @@ function CategoriesSection() {
         title: formData.title.trim(),
         parentId: formData.parentId || null,
         requiresSizes: formData.requiresSizes,
+        subcategoryIds: formData.subcategoryIds,
         locale: 'en',
       });
       setShowEditModal(false);
       setEditingCategory(null);
-      setFormData({ title: '', parentId: '', requiresSizes: false });
+      setFormData({ title: '', parentId: '', requiresSizes: false, subcategoryIds: [] });
       fetchCategories();
       alert(t('admin.categories.updatedSuccess'));
     } catch (err: any) {
@@ -196,10 +216,10 @@ function CategoriesSection() {
       <div className="flex justify-end">
         <Button
           variant="primary"
-          onClick={() => {
-            setFormData({ title: '', parentId: '', requiresSizes: false });
-            setShowAddModal(true);
-          }}
+                onClick={() => {
+                  setFormData({ title: '', parentId: '', requiresSizes: false, subcategoryIds: [] });
+                  setShowAddModal(true);
+                }}
           className="flex items-center gap-2"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -337,7 +357,7 @@ function CategoriesSection() {
                 variant="ghost"
                 onClick={() => {
                   setShowAddModal(false);
-                  setFormData({ title: '', parentId: '', requiresSizes: false });
+                  setFormData({ title: '', parentId: '', requiresSizes: false, subcategoryIds: [] });
                 }}
                 disabled={saving}
               >
@@ -401,6 +421,49 @@ function CategoriesSection() {
                   </span>
                 </label>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Subcategories
+                </label>
+                <div className="max-h-60 overflow-y-auto border border-gray-300 rounded-md p-3 space-y-2">
+                  {categories
+                    .filter((cat) => 
+                      cat.id !== editingCategory.id // Exclude current category
+                    )
+                    .map((cat) => {
+                      const isChecked = formData.subcategoryIds.includes(cat.id);
+                      return (
+                        <label key={cat.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setFormData({
+                                  ...formData,
+                                  subcategoryIds: [...formData.subcategoryIds, cat.id],
+                                });
+                              } else {
+                                setFormData({
+                                  ...formData,
+                                  subcategoryIds: formData.subcategoryIds.filter(id => id !== cat.id),
+                                });
+                              }
+                            }}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-700">{cat.title}</span>
+                        </label>
+                      );
+                    })}
+                  {categories.filter((cat) => 
+                    cat.id !== editingCategory.id && 
+                    cat.parentId !== editingCategory.id
+                  ).length === 0 && (
+                    <p className="text-sm text-gray-500">No available categories to assign as subcategories</p>
+                  )}
+                </div>
+              </div>
             </div>
             <div className="flex gap-3 mt-6">
               <Button
@@ -416,7 +479,7 @@ function CategoriesSection() {
                 onClick={() => {
                   setShowEditModal(false);
                   setEditingCategory(null);
-                  setFormData({ title: '', parentId: '', requiresSizes: false });
+                  setFormData({ title: '', parentId: '', requiresSizes: false, subcategoryIds: [] });
                 }}
                 disabled={saving}
               >

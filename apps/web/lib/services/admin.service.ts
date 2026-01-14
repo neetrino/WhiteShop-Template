@@ -2284,6 +2284,55 @@ class AdminService {
   }
 
   /**
+   * Get category by ID with children
+   */
+  async getCategoryById(categoryId: string) {
+    const category = await db.category.findUnique({
+      where: { id: categoryId },
+      include: {
+        translations: {
+          where: { locale: "en" },
+          take: 1,
+        },
+        children: {
+          include: {
+            translations: {
+              where: { locale: "en" },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+
+    if (!category) {
+      return null;
+    }
+
+    const translations = Array.isArray(category.translations) ? category.translations : [];
+    const translation = translations[0] || null;
+
+    return {
+      id: category.id,
+      title: translation?.title || "",
+      slug: translation?.slug || "",
+      parentId: category.parentId,
+      requiresSizes: category.requiresSizes || false,
+      children: category.children.map((child: { id: string; parentId: string | null; requiresSizes: boolean | null; translations?: Array<{ title: string; slug: string }> }) => {
+        const childTranslations = Array.isArray(child.translations) ? child.translations : [];
+        const childTranslation = childTranslations[0] || null;
+        return {
+          id: child.id,
+          title: childTranslation?.title || "",
+          slug: childTranslation?.slug || "",
+          parentId: child.parentId,
+          requiresSizes: child.requiresSizes || false,
+        };
+      }),
+    };
+  }
+
+  /**
    * Update category
    */
   async updateCategory(categoryId: string, data: {
@@ -2291,6 +2340,7 @@ class AdminService {
     locale?: string;
     parentId?: string | null;
     requiresSizes?: boolean;
+    subcategoryIds?: string[];
   }) {
     const locale = data.locale || "en";
     
@@ -2351,6 +2401,43 @@ class AdminService {
           title: "Circular reference",
           detail: "Cannot set parent to a category that is a descendant of this category",
         };
+      }
+    }
+
+    // Update subcategories if provided
+    if (data.subcategoryIds !== undefined) {
+      // First, remove all existing children relationships
+      await db.category.updateMany({
+        where: { parentId: categoryId },
+        data: { parentId: null },
+      });
+
+      // Then, set new children relationships (prevent circular references)
+      if (data.subcategoryIds.length > 0) {
+        // Filter out the category itself and its descendants
+        const validSubcategoryIds = data.subcategoryIds.filter(id => id !== categoryId);
+        
+        // Check for circular references
+        for (const subId of validSubcategoryIds) {
+          const isDescendant = await this.isCategoryDescendant(categoryId, subId);
+          if (isDescendant) {
+            throw {
+              status: 400,
+              type: "https://api.shop.am/problems/bad-request",
+              title: "Circular reference",
+              detail: "Cannot set a descendant category as subcategory",
+            };
+          }
+        }
+
+        if (validSubcategoryIds.length > 0) {
+          await db.category.updateMany({
+            where: { 
+              id: { in: validSubcategoryIds },
+            },
+            data: { parentId: categoryId },
+          });
+        }
       }
     }
 
