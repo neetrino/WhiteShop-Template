@@ -1217,6 +1217,7 @@ class AdminService {
     featured?: boolean;
     locale: string;
     media?: any[];
+    mainProductImage?: string;
     labels?: Array<{
       type: string;
       value: string;
@@ -1339,12 +1340,37 @@ class AdminService {
         
         console.log('✅ [ADMIN SERVICE] All variant SKUs are unique');
 
+        // Prepare media array - use mainProductImage if provided and media is empty
+        let finalMedia = data.media || [];
+        if (data.mainProductImage && finalMedia.length === 0) {
+          // If mainProductImage is provided but media is empty, use mainProductImage as first media item
+          finalMedia = [data.mainProductImage];
+          console.log('📸 [ADMIN SERVICE] Using mainProductImage as media:', data.mainProductImage.substring(0, 50) + '...');
+        } else if (data.mainProductImage && finalMedia.length > 0) {
+          // If both are provided, ensure mainProductImage is first in media array
+          const mainImageIndex = finalMedia.findIndex((m: any) => {
+            const url = typeof m === 'string' ? m : m.url;
+            return url === data.mainProductImage;
+          });
+          if (mainImageIndex === -1) {
+            // mainProductImage not in media array, add it as first
+            finalMedia = [data.mainProductImage, ...finalMedia];
+            console.log('📸 [ADMIN SERVICE] Added mainProductImage as first media item');
+          } else if (mainImageIndex > 0) {
+            // mainProductImage is in media but not first, move it to first
+            const mainImage = finalMedia[mainImageIndex];
+            finalMedia.splice(mainImageIndex, 1);
+            finalMedia.unshift(mainImage);
+            console.log('📸 [ADMIN SERVICE] Moved mainProductImage to first position in media');
+          }
+        }
+
         const product = await tx.product.create({
           data: {
             brandId: data.brandId || undefined,
             primaryCategoryId: data.primaryCategoryId || undefined,
             categoryIds: data.categoryIds || [],
-            media: data.media || [],
+            media: finalMedia,
             published: data.published,
             featured: data.featured ?? false,
             publishedAt: data.published ? new Date() : undefined,
