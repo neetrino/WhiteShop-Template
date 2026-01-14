@@ -2722,40 +2722,47 @@ function AddProductPageContent() {
         return url.startsWith('data:image/');
       };
 
-      // Helper function to upload base64 images and get URLs
-      const uploadBase64Images = async (images: string[]): Promise<string[]> => {
-        // Filter base64 images
-        const base64Images = images.filter(isBase64Image);
-        
-        if (base64Images.length === 0) {
-          // No base64 images, return as is
-          return images;
-        }
+      // Helper function to check if image is already a URL
+      const isUrl = (url: string): boolean => {
+        return url.startsWith('http://') || url.startsWith('https://');
+      };
 
-        console.log('📤 [ADMIN] Uploading base64 images:', base64Images.length);
+      // Helper function to get base64 size in bytes (approximate)
+      const getBase64Size = (base64: string): number => {
+        // Remove data:image/...;base64, prefix
+        const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
+        // Base64 is ~33% larger than binary, so we calculate approximate size
+        return Math.ceil(base64Data.length * 0.75);
+      };
+
+      // Helper function to process images - keep URLs as is, filter out large base64
+      const processImages = (images: string[]): { processed: string[]; skipped: number } => {
+        const MAX_BASE64_SIZE = 500 * 1024; // 500KB per image max
+        let skippedCount = 0;
         
-        try {
-          // Upload base64 images to get URLs
-          const uploadResponse = await apiClient.post<{ urls: string[] }>(
-            '/api/v1/admin/products/upload-images',
-            { images: base64Images }
-          );
+        const processed = images.filter(img => {
+          // If already a URL, keep as is
+          if (isUrl(img)) {
+            return true;
+          }
           
-          console.log('✅ [ADMIN] Images uploaded, received URLs:', uploadResponse.urls.length);
+          // If base64, check size
+          if (isBase64Image(img)) {
+            const size = getBase64Size(img);
+            if (size > MAX_BASE64_SIZE) {
+              console.warn(`⚠️ [ADMIN] Image too large (${Math.round(size / 1024)}KB), skipping to avoid 413 error.`);
+              skippedCount++;
+              return false; // Skip large base64 images
+            }
+            // Small base64, keep as is (will be in payload)
+            return true;
+          }
           
-          // Replace base64 images with URLs
-          const urlMap = new Map<string, string>();
-          base64Images.forEach((base64, index) => {
-            urlMap.set(base64, uploadResponse.urls[index]);
-          });
-          
-          // Replace base64 with URLs in the original array
-          return images.map(img => urlMap.get(img) || img);
-        } catch (uploadError: any) {
-          console.error('❌ [ADMIN] Error uploading images:', uploadError);
-          // If upload fails, continue with base64 (may cause 413 error, but at least we tried)
-          throw new Error(`Failed to upload images: ${uploadError?.data?.detail || uploadError?.message || 'Unknown error'}`);
-        }
+          // Unknown format, keep as is
+          return true;
+        });
+        
+        return { processed, skipped: skippedCount };
       };
 
       // Collect all images that need to be uploaded (product images + variant images)
@@ -2786,13 +2793,21 @@ function AddProductPageContent() {
       // Combine all images
       const allImagesToUpload = [...allImages, ...variantImages];
 
-      // Upload base64 images if any
+      // Process images - keep URLs, keep small base64, skip large base64
       let processedImages: string[] = [];
       let processedVariantImages: string[] = [];
+      let skippedImagesCount = 0;
       if (allImagesToUpload.length > 0) {
-        const allProcessed = await uploadBase64Images(allImagesToUpload);
-        processedImages = allProcessed.slice(0, allImages.length);
-        processedVariantImages = allProcessed.slice(allImages.length);
+        const allProcessed = processImages(allImagesToUpload);
+        processedImages = allProcessed.processed.slice(0, allImages.length);
+        processedVariantImages = allProcessed.processed.slice(allImages.length);
+        skippedImagesCount = allProcessed.skipped;
+      }
+      
+      // Warn user if images were skipped
+      if (skippedImagesCount > 0) {
+        console.warn(`⚠️ [ADMIN] ${skippedImagesCount} large image(s) were skipped to avoid 413 error.`);
+        alert(`Ուշադրություն: ${skippedImagesCount} մեծ պատկեր(ներ) բաց թողնվեցին 413 սխալից խուսափելու համար: Խնդրում ենք օգտագործել ավելի փոքր պատկերներ:`);
       }
 
       // Update variants with processed images
