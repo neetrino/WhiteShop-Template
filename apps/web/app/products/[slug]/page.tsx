@@ -1699,6 +1699,9 @@ export default function ProductPage({ params }: ProductPageProps) {
                 }}>
                 {isAddingToCart ? t(language, 'product.adding') : (isOutOfStock ? t(language, 'product.outOfStock') : (isVariationRequired ? getRequiredAttributesMessage() : t(language, 'product.addToCart')))}
               </button>
+              <button onClick={handleCompareToggle} className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center transition-all duration-200 ${isInCompare ? 'border-gray-900 bg-gray-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <CompareIcon isActive={isInCompare} />
+              </button>
               <button onClick={handleAddToWishlist} className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center ${isInWishlist ? 'border-gray-900 bg-gray-50' : 'border-gray-200'}`}>
                 <Heart fill={isInWishlist ? 'currentColor' : 'none'} />
               </button>
