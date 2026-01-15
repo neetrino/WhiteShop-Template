@@ -261,6 +261,7 @@ model ProductVariant {
   imageUrl       String?
   position       Int                    @default(0)
   published      Boolean                @default(true)
+  attributes     Json?                  // JSONB: Stores variant attributes as { "color": [...], "size": [...] }
   options        ProductVariantOption[]
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt

@@ -1065,7 +1065,19 @@ class AdminService {
         },
         variants: {
           include: {
-            options: true,
+            options: {
+              include: {
+                attributeValue: {
+                  include: {
+                    attribute: true,
+                    translations: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: {
+            position: 'asc',
           },
         },
         labels: true,
@@ -1109,11 +1121,64 @@ class AdminService {
         position: label.position,
         color: label.color,
       })),
-      variants: variants.map((variant: { id: string; price: number; sku: string | null; stock: number; compareAtPrice?: number | null; imageUrl?: string | null; published?: boolean; options?: Array<{ attributeKey: string; value: string }> }) => {
+      variants: variants.map((variant: any) => {
         // Безопасное получение options с проверкой на существование массива
         const options = Array.isArray(variant.options) ? variant.options : [];
+        
+        // Get attributes from JSONB column if available
+        let attributes = null;
+        let colorValues: string[] = [];
+        let sizeValues: string[] = [];
+        
+        if (variant.attributes) {
+          // attributes is already in JSONB format: { "color": [...], "size": [...] }
+          attributes = variant.attributes;
+          
+          // Extract color and size values from JSONB attributes
+          if (attributes.color && Array.isArray(attributes.color)) {
+            colorValues = attributes.color.map((item: any) => item.value || item).filter(Boolean);
+          }
+          if (attributes.size && Array.isArray(attributes.size)) {
+            sizeValues = attributes.size.map((item: any) => item.value || item).filter(Boolean);
+          }
+        } else if (options.length > 0) {
+          // Fallback: build attributes from options if JSONB column is empty
+          const attributesMap: Record<string, Array<{ valueId: string; value: string; attributeKey: string }>> = {};
+          options.forEach((opt: any) => {
+            const attrKey = opt.attributeKey || opt.attributeValue?.attribute?.key;
+            const value = opt.value || opt.attributeValue?.value;
+            const valueId = opt.valueId || opt.attributeValue?.id;
+            
+            if (attrKey && value && valueId) {
+              if (!attributesMap[attrKey]) {
+                attributesMap[attrKey] = [];
+              }
+              if (!attributesMap[attrKey].some((item: any) => item.valueId === valueId)) {
+                attributesMap[attrKey].push({
+                  valueId,
+                  value,
+                  attributeKey: attrKey,
+                });
+              }
+              
+              // Extract color and size for backward compatibility
+              if (attrKey === "color") {
+                colorValues.push(value);
+              } else if (attrKey === "size") {
+                sizeValues.push(value);
+              }
+            }
+          });
+          attributes = Object.keys(attributesMap).length > 0 ? attributesMap : null;
+        }
+        
+        // For backward compatibility: use first color/size if multiple values exist
         const colorOption = options.find((opt: { attributeKey: string }) => opt.attributeKey === "color");
         const sizeOption = options.find((opt: { attributeKey: string }) => opt.attributeKey === "size");
+        
+        // Use first value from arrays or fallback to single option value
+        const color = colorValues.length > 0 ? colorValues[0] : (colorOption?.value || "");
+        const size = sizeValues.length > 0 ? sizeValues[0] : (sizeOption?.value || "");
 
         return {
           id: variant.id,
@@ -1121,10 +1186,15 @@ class AdminService {
           compareAtPrice: variant.compareAtPrice?.toString() || "",
           stock: variant.stock.toString(),
           sku: variant.sku || "",
-          color: colorOption?.value || "",
-          size: sizeOption?.value || "",
+          color: color, // First color for backward compatibility
+          size: size, // First size for backward compatibility
           imageUrl: variant.imageUrl || "",
           published: variant.published || false,
+          attributes: attributes, // JSONB attributes with all values - IMPORTANT: This is the main field
+          options: options, // Keep options for backward compatibility
+          // Additional fields for new format support
+          colorValues: colorValues, // All color values
+          sizeValues: sizeValues, // All size values
         };
       }),
     };
@@ -1254,21 +1324,56 @@ class AdminService {
         const variantsData = await Promise.all(
           data.variants.map(async (variant: any, variantIndex: number) => {
             const options: any[] = [];
+            const attributesMap: Record<string, Array<{ valueId: string; value: string; attributeKey: string }>> = {};
             
             // If variant has explicit options array, use it (new format)
             if (variant.options && Array.isArray(variant.options) && variant.options.length > 0) {
               for (const opt of variant.options) {
+                let valueId: string | null = null;
+                let attributeKey: string | null = null;
+                let value: string | null = null;
+
                 if (opt.valueId) {
                   // New format: use valueId
+                  valueId = opt.valueId;
+                  // Fetch AttributeValue to get value and attributeKey
+                  const attrValue = await tx.attributeValue.findUnique({
+                    where: { id: opt.valueId },
+                    include: { attribute: true },
+                  });
+                  if (attrValue) {
+                    attributeKey = attrValue.attribute.key;
+                    value = attrValue.value;
+                  }
                   options.push({ valueId: opt.valueId });
                 } else if (opt.attributeKey && opt.value) {
                   // Try to find or create AttributeValue
-                  const valueId = await findOrCreateAttributeValue(opt.attributeKey, opt.value, data.locale);
-                  if (valueId) {
-                    options.push({ valueId: valueId });
+                  const foundValueId = await findOrCreateAttributeValue(opt.attributeKey, opt.value, data.locale);
+                  if (foundValueId) {
+                    valueId = foundValueId;
+                    attributeKey = opt.attributeKey;
+                    value = opt.value;
+                    options.push({ valueId: foundValueId });
                   } else {
                     // Fallback to old format if AttributeValue not found
+                    attributeKey = opt.attributeKey;
+                    value = opt.value;
                     options.push({ attributeKey: opt.attributeKey, value: opt.value });
+                  }
+                }
+
+                // Build attributes JSONB structure
+                if (attributeKey && valueId && value) {
+                  if (!attributesMap[attributeKey]) {
+                    attributesMap[attributeKey] = [];
+                  }
+                  // Check if this valueId is already added for this attribute
+                  if (!attributesMap[attributeKey].some(item => item.valueId === valueId)) {
+                    attributesMap[attributeKey].push({
+                      valueId,
+                      value,
+                      attributeKey,
+                    });
                   }
                 }
               }
@@ -1278,6 +1383,14 @@ class AdminService {
                 const colorValueId = await findOrCreateAttributeValue("color", variant.color, data.locale);
                 if (colorValueId) {
                   options.push({ valueId: colorValueId });
+                  if (!attributesMap["color"]) {
+                    attributesMap["color"] = [];
+                  }
+                  attributesMap["color"].push({
+                    valueId: colorValueId,
+                    value: variant.color,
+                    attributeKey: "color",
+                  });
                 } else {
                   // Fallback to old format if AttributeValue not found
                   options.push({ attributeKey: "color", value: variant.color });
@@ -1288,6 +1401,14 @@ class AdminService {
                 const sizeValueId = await findOrCreateAttributeValue("size", variant.size, data.locale);
                 if (sizeValueId) {
                   options.push({ valueId: sizeValueId });
+                  if (!attributesMap["size"]) {
+                    attributesMap["size"] = [];
+                  }
+                  attributesMap["size"].push({
+                    valueId: sizeValueId,
+                    value: variant.size,
+                    attributeKey: "size",
+                  });
                 } else {
                   // Fallback to old format if AttributeValue not found
                   options.push({ attributeKey: "size", value: variant.size });
@@ -1310,6 +1431,11 @@ class AdminService {
               usedSkus
             );
 
+            // Convert attributesMap to JSONB format
+            const attributesJson = Object.keys(attributesMap).length > 0 ? attributesMap : null;
+
+            console.log(`📦 [ADMIN SERVICE] Variant ${variantIndex + 1} attributes:`, JSON.stringify(attributesJson, null, 2));
+
             return {
               sku: uniqueSku,
               price,
@@ -1317,6 +1443,7 @@ class AdminService {
               stock: isNaN(stock) ? 0 : stock,
               imageUrl: variant.imageUrl || undefined,
               published: variant.published !== false,
+              attributes: attributesJson, // JSONB column
               options: {
                 create: options,
               },
@@ -1492,6 +1619,11 @@ class AdminService {
         size?: string;
         imageUrl?: string;
         published?: boolean;
+        options?: Array<{
+          attributeKey: string;
+          value: string;
+          valueId?: string;
+        }>;
       }>;
     }
   ) {
@@ -1616,25 +1748,91 @@ class AdminService {
             const locale = data.locale || "en";
             for (const variant of data.variants) {
               const options: any[] = [];
+              const attributesMap: Record<string, Array<{ valueId: string; value: string; attributeKey: string }>> = {};
               
-              // Try to find or create AttributeValues for color and size
-              if (variant.color) {
-                const colorValueId = await findOrCreateAttributeValue("color", variant.color, locale);
-                if (colorValueId) {
-                  options.push({ valueId: colorValueId });
-                } else {
-                  // Fallback to old format if AttributeValue not found
-                  options.push({ attributeKey: "color", value: variant.color });
+              // Support both old format (color/size) and new format (options array)
+              if (variant.options && Array.isArray(variant.options) && variant.options.length > 0) {
+                // New format: use options array
+                for (const opt of variant.options) {
+                  let valueId: string | null = null;
+                  let attributeKey: string | null = null;
+                  let value: string | null = null;
+
+                  if (opt.valueId) {
+                    valueId = opt.valueId;
+                    const attrValue = await tx.attributeValue.findUnique({
+                      where: { id: opt.valueId },
+                      include: { attribute: true },
+                    });
+                    if (attrValue) {
+                      attributeKey = attrValue.attribute.key;
+                      value = attrValue.value;
+                    }
+                    options.push({ valueId: opt.valueId });
+                  } else if (opt.attributeKey && opt.value) {
+                    const foundValueId = await findOrCreateAttributeValue(opt.attributeKey, opt.value, locale);
+                    if (foundValueId) {
+                      valueId = foundValueId;
+                      attributeKey = opt.attributeKey;
+                      value = opt.value;
+                      options.push({ valueId: foundValueId });
+                    } else {
+                      attributeKey = opt.attributeKey;
+                      value = opt.value;
+                      options.push({ attributeKey: opt.attributeKey, value: opt.value });
+                    }
+                  }
+
+                  // Build attributes JSONB structure
+                  if (attributeKey && valueId && value) {
+                    if (!attributesMap[attributeKey]) {
+                      attributesMap[attributeKey] = [];
+                    }
+                    if (!attributesMap[attributeKey].some(item => item.valueId === valueId)) {
+                      attributesMap[attributeKey].push({
+                        valueId,
+                        value,
+                        attributeKey,
+                      });
+                    }
+                  }
                 }
-              }
-              
-              if (variant.size) {
-                const sizeValueId = await findOrCreateAttributeValue("size", variant.size, locale);
-                if (sizeValueId) {
-                  options.push({ valueId: sizeValueId });
-                } else {
-                  // Fallback to old format if AttributeValue not found
-                  options.push({ attributeKey: "size", value: variant.size });
+              } else {
+                // Old format: Try to find or create AttributeValues for color and size
+                if (variant.color) {
+                  const colorValueId = await findOrCreateAttributeValue("color", variant.color, locale);
+                  if (colorValueId) {
+                    options.push({ valueId: colorValueId });
+                    if (!attributesMap["color"]) {
+                      attributesMap["color"] = [];
+                    }
+                    attributesMap["color"].push({
+                      valueId: colorValueId,
+                      value: variant.color,
+                      attributeKey: "color",
+                    });
+                  } else {
+                    // Fallback to old format if AttributeValue not found
+                    options.push({ attributeKey: "color", value: variant.color });
+                  }
+                }
+                
+                if (variant.size) {
+                  const sizeValueId = await findOrCreateAttributeValue("size", variant.size, locale);
+                  if (sizeValueId) {
+                    options.push({ valueId: sizeValueId });
+                    if (!attributesMap["size"]) {
+                      attributesMap["size"] = [];
+                    }
+                    attributesMap["size"].push({
+                      valueId: sizeValueId,
+                      value: variant.size,
+                      attributeKey: "size",
+                    });
+                  } else {
+                    // Fallback to old format if AttributeValue not found
+                    options.push({ attributeKey: "size", value: variant.size });
+                  }
                 }
               }
 
@@ -1648,6 +1846,9 @@ class AdminService {
                 throw new Error(`Invalid price value: ${variant.price}`);
               }
 
+              // Convert attributesMap to JSONB format
+              const attributesJson = Object.keys(attributesMap).length > 0 ? attributesMap : null;
+
               await tx.productVariant.create({
                 data: {
                   productId,
@@ -1657,6 +1858,7 @@ class AdminService {
                   stock: isNaN(stock) ? 0 : stock,
                   imageUrl: variant.imageUrl || undefined,
                   published: variant.published !== false,
+                  attributes: attributesJson, // JSONB column
                   options: {
                     create: options,
                   },

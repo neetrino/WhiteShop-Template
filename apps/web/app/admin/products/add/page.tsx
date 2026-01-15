@@ -717,7 +717,10 @@ function AddProductPageContent() {
           };
           
           // Collect all images assigned to variants to filter them out from general media
+          // IMPORTANT: Also collect variant images directly from variant.imageUrl (new format)
           const variantImages = new Set<string>();
+          
+          // Collect images from mergedVariant.colors (old format)
           mergedVariant.colors.forEach(c => {
             c.images.forEach(img => {
               if (img) {
@@ -728,18 +731,82 @@ function AddProductPageContent() {
               }
             });
           });
+          
+          // Also collect images directly from variant.imageUrl (new format - for generatedVariants)
+          console.log('🖼️ [ADMIN] Collecting variant images from product.variants...');
+          (product.variants || []).forEach((variant: any, idx: number) => {
+            if (variant.imageUrl) {
+              // For base64 images, don't split by comma (base64 strings can contain commas)
+              // Only split if it's not a base64 string
+              if (typeof variant.imageUrl === 'string' && variant.imageUrl.startsWith('data:')) {
+                // Base64 image - use full string, don't split
+                variantImages.add(variant.imageUrl);
+                console.log(`  ✅ Added variant base64 image (length: ${variant.imageUrl.length})`);
+              } else {
+                // Regular URL - can be comma-separated
+                const imageUrls = typeof variant.imageUrl === 'string' 
+                  ? variant.imageUrl.split(',').map((url: string) => url.trim()).filter(Boolean)
+                  : [];
+                imageUrls.forEach((url: string) => {
+                  if (url) {
+                    // Regular URL - normalize
+                    variantImages.add(url);
+                    const normalizedWithSlash = url.startsWith('/') ? url : `/${url}`;
+                    const normalizedWithoutSlash = url.startsWith('/') ? url.substring(1) : url;
+                    variantImages.add(normalizedWithSlash);
+                    variantImages.add(normalizedWithoutSlash);
+                    const urlWithoutQuery = url.split('?')[0];
+                    if (urlWithoutQuery !== url) {
+                      variantImages.add(urlWithoutQuery);
+                      const normalizedWithoutQuery = urlWithoutQuery.startsWith('/') ? urlWithoutQuery : `/${urlWithoutQuery}`;
+                      variantImages.add(normalizedWithoutQuery);
+                    }
+                    console.log(`  ✅ Added variant URL: ${url.substring(0, 50)}...`);
+                  }
+                });
+              }
+            } else {
+              console.log(`🖼️ [ADMIN] Variant ${idx} has no imageUrl`);
+            }
+          });
+          console.log(`🖼️ [ADMIN] Total variant images collected: ${variantImages.size}`);
+
+          // Helper function to normalize URL for comparison
+          const normalizeUrlForComparison = (url: string): string[] => {
+            if (!url) return [];
+            // For base64 images, use the full string for comparison
+            if (url.startsWith('data:')) {
+              return [url];
+            }
+            // For regular URLs, normalize them
+            const normalized = url.trim();
+            const withSlash = normalized.startsWith('/') ? normalized : `/${normalized}`;
+            const withoutSlash = normalized.startsWith('/') ? normalized.substring(1) : normalized;
+            const withoutQuery = normalized.split('?')[0];
+            const withoutQueryWithSlash = withoutQuery.startsWith('/') ? withoutQuery : `/${withoutQuery}`;
+            return [normalized, withSlash, withoutSlash, withoutQuery, withoutQueryWithSlash];
+          };
 
           const mediaList = product.media || [];
+          console.log('🖼️ [ADMIN] Filtering main media images. Total media:', mediaList.length);
           // Filter out images that are already assigned to variants
           const normalizedMedia = Array.isArray(mediaList)
             ? mediaList
                 .map((item: any) => (typeof item === 'string' ? item : item?.url || ''))
                 .filter((url: string) => {
                   if (!url) return false;
-                  const normalizedUrl = url.startsWith('/') ? url : `/${url}`;
-                  return !variantImages.has(url) && !variantImages.has(normalizedUrl);
+                  // Check all normalized versions
+                  const normalizedVersions = normalizeUrlForComparison(url);
+                  const isVariantImage = normalizedVersions.some(normalized => variantImages.has(normalized));
+                  if (isVariantImage) {
+                    console.log(`  ❌ Filtered out variant image from main (length: ${url.length})`);
+                  } else {
+                    console.log(`  ✅ Keeping main image (length: ${url.length})`);
+                  }
+                  return !isVariantImage;
                 })
             : [];
+          console.log(`🖼️ [ADMIN] Main media after filtering: ${normalizedMedia.length} images`);
           
           const featuredIndexFromApi = Array.isArray(mediaList)
             ? mediaList.findIndex((item: any) => {
@@ -870,9 +937,10 @@ function AddProductPageContent() {
         setSelectedAttributeValueIds(attributeValueIdsMap);
       }
       
-      // Group variants: combine variants that share the same attribute structure
-      // but have different values, so all values appear in one cell per attribute
-      const variantGroups = new Map<string, Array<{
+      // Convert each variant to generatedVariants format
+      // NEW: Each variant becomes a separate row (no grouping)
+      // Extract attribute values from JSONB attributes column or from options
+      const convertedVariants: Array<{
         id: string;
         selectedValueIds: string[];
         price: string;
@@ -880,22 +948,67 @@ function AddProductPageContent() {
         stock: string;
         sku: string;
         image: string | null;
-      }>>();
+      }> = [];
       
       productVariants.forEach((variant: any, variantIndex: number) => {
         const selectedValueIds: string[] = [];
-        const variantAttributeIds: string[] = [];
         
-        // Collect all valueIds from variant options
-        if (variant.options && Array.isArray(variant.options)) {
+        // First, try to get attribute values from JSONB attributes column
+        if (variant.attributes && typeof variant.attributes === 'object') {
+          console.log(`🔍 [ADMIN] Variant ${variantIndex} has attributes JSONB:`, variant.attributes);
+          
+          // Iterate through all attributes in JSONB
+          Object.keys(variant.attributes).forEach((attributeKey) => {
+            const attribute = attributes.find(a => a.key === attributeKey);
+            if (!attribute) {
+              console.warn(`⚠️ [ADMIN] Attribute not found for key: ${attributeKey}`);
+              return;
+            }
+            
+            const attributeValues = variant.attributes[attributeKey];
+            if (Array.isArray(attributeValues)) {
+              attributeValues.forEach((attrValue: any) => {
+                // Support both formats: {valueId, value, attributeKey} or just value string
+                const valueId = attrValue.valueId || attrValue.id;
+                const value = attrValue.value || attrValue;
+                
+                if (valueId) {
+                  // If we have valueId, use it directly
+                  if (!selectedValueIds.includes(valueId)) {
+                    selectedValueIds.push(valueId);
+                  }
+                } else if (value) {
+                  // If we only have value string, find the corresponding valueId
+                  const foundValue = attribute.values.find(v => 
+                    v.value === value || v.label === value
+                  );
+                  if (foundValue && !selectedValueIds.includes(foundValue.id)) {
+                    selectedValueIds.push(foundValue.id);
+                  }
+                }
+              });
+            }
+          });
+        }
+        
+        // Fallback: collect valueIds from variant options if JSONB is empty
+        // Group options by variant (all options for this variant should be in one row)
+        if (selectedValueIds.length === 0 && variant.options && Array.isArray(variant.options)) {
+          console.log(`🔍 [ADMIN] Variant ${variantIndex} using options fallback:`, variant.options);
+          
+          // Group options by attribute to collect all values for each attribute
+          const attributeValueMap: Record<string, Set<string>> = {};
+          
           variant.options.forEach((opt: any) => {
             // Try to get attributeId and valueId directly or from attributeValue relation
             let attributeId = opt.attributeId;
             let valueId = opt.valueId;
+            let attributeKey = opt.attributeKey;
             
             // If not directly available, try to get from attributeValue relation
             if (!attributeId && opt.attributeValue) {
               attributeId = opt.attributeValue.attributeId || opt.attributeValue.attribute?.id || opt.attributeValue.attributeId;
+              attributeKey = opt.attributeValue.attribute?.key || opt.attributeValue.attributeKey;
             }
             if (!valueId && opt.attributeValue) {
               valueId = opt.attributeValue.id || opt.attributeValue.valueId;
@@ -906,6 +1019,7 @@ function AddProductPageContent() {
               const foundAttr = attributes.find(a => a.key === opt.attributeKey);
               if (foundAttr) {
                 attributeId = foundAttr.id;
+                attributeKey = foundAttr.key;
               }
             }
             
@@ -920,69 +1034,55 @@ function AddProductPageContent() {
               }
             }
             
-            if (attributeId) {
-              if (!variantAttributeIds.includes(attributeId)) {
-                variantAttributeIds.push(attributeId);
+            // Group by attribute key to collect all values for this variant
+            if (attributeKey && valueId) {
+              if (!attributeValueMap[attributeKey]) {
+                attributeValueMap[attributeKey] = new Set();
               }
-              if (valueId) {
+              attributeValueMap[attributeKey].add(valueId);
+            }
+          });
+          
+          // Collect all valueIds from all attributes for this variant
+          Object.values(attributeValueMap).forEach((valueIdSet) => {
+            valueIdSet.forEach((valueId) => {
+              if (!selectedValueIds.includes(valueId)) {
                 selectedValueIds.push(valueId);
               }
-            }
+            });
           });
         }
         
-        // Group variants by their attribute structure (which attributes they use)
-        // Variants with the same attributes will be combined to show all values in one cell
-        const groupKey = variantAttributeIds.sort().join('|');
-        
-        if (!variantGroups.has(groupKey)) {
-          variantGroups.set(groupKey, []);
+        // Create a separate row for each variant
+        // Extract image URL from variant.imageUrl (can be comma-separated)
+        let variantImage: string | null = null;
+        if (variant.imageUrl) {
+          // For base64 images, don't split by comma (base64 strings can contain commas)
+          // Only split if it's not a base64 string
+          if (typeof variant.imageUrl === 'string' && variant.imageUrl.startsWith('data:')) {
+            // Base64 image - use full string, don't split
+            variantImage = variant.imageUrl;
+            console.log(`🖼️ [ADMIN] Variant ${variantIndex} base64 image length:`, variantImage?.length || 0);
+          } else {
+            // Regular URL - can be comma-separated
+            const imageUrls = typeof variant.imageUrl === 'string' 
+              ? variant.imageUrl.split(',').map((url: string) => url.trim()).filter(Boolean)
+              : [];
+            variantImage = imageUrls.length > 0 ? imageUrls[0] : null;
+            console.log(`🖼️ [ADMIN] Variant ${variantIndex} imageUrl length:`, variant.imageUrl?.length || 0, '→ extracted image length:', variantImage?.length || 0);
+          }
+        } else {
+          console.log(`🖼️ [ADMIN] Variant ${variantIndex} has no imageUrl`);
         }
         
-        variantGroups.get(groupKey)!.push({
-          id: variant.id || `variant-${Date.now()}-${Math.random()}`,
-          selectedValueIds,
+        convertedVariants.push({
+          id: variant.id || `variant-${Date.now()}-${variantIndex}-${Math.random()}`,
+          selectedValueIds, // This variant's specific attribute values
           price: variant.price !== undefined && variant.price !== null ? String(variant.price) : '0.00',
           compareAtPrice: variant.compareAtPrice !== undefined && variant.compareAtPrice !== null ? String(variant.compareAtPrice) : '0.00',
           stock: variant.stock !== undefined && variant.stock !== null ? String(variant.stock) : '0',
           sku: variant.sku || '',
-          image: variant.imageUrl || null,
-        });
-      });
-      
-      // Convert grouped variants to generatedVariants format
-      // For each group, create a variant that combines all value IDs from all variants in that group
-      // This ensures all values for each attribute are shown in one cell
-      const convertedVariants: Array<{
-        id: string;
-        selectedValueIds: string[];
-        price: string;
-        compareAtPrice: string;
-        stock: string;
-        sku: string;
-        image: string | null;
-      }> = [];
-      
-      variantGroups.forEach((groupVariants, groupKey) => {
-        // Collect all unique value IDs from all variants in this group
-        // This combines all values for each attribute into one variant row
-        const allValueIdsInGroup = new Set<string>();
-        groupVariants.forEach(v => {
-          v.selectedValueIds.forEach(id => allValueIdsInGroup.add(id));
-        });
-        
-        // Use the first variant's data as base (price, stock, SKU, image)
-        // But include all value IDs so all values show in one cell per attribute
-        const baseVariant = groupVariants[0];
-        
-        convertedVariants.push({
-          id: baseVariant.id,
-          selectedValueIds: Array.from(allValueIdsInGroup), // All values from all variants in this group
-          price: baseVariant.price,
-          compareAtPrice: baseVariant.compareAtPrice,
-          stock: baseVariant.stock,
-          sku: baseVariant.sku,
-          image: baseVariant.image,
+          image: variantImage, // Use extracted image URL
         });
       });
       
@@ -990,7 +1090,6 @@ function AddProductPageContent() {
         setGeneratedVariants(convertedVariants);
         console.log('✅ [ADMIN] Converted product variants to generatedVariants:', {
           totalVariants: convertedVariants.length,
-          totalGroups: variantGroups.size,
           totalOriginalVariants: productVariants.length,
           attributeValueIdsMap,
           convertedVariants: convertedVariants.map(v => ({
@@ -1062,6 +1161,13 @@ function AddProductPageContent() {
       const manuallyAddedVariants = prev.filter(v => v.id !== 'variant-all');
       const existingAutoVariant = prev.find(v => v.id === 'variant-all');
       
+      // If there are manually added variants, don't create auto-generated variant
+      // Only create auto-generated variant if there are no manual variants
+      if (manuallyAddedVariants.length > 0) {
+        console.log('✅ [VARIANT BUILDER] Manual variants exist, skipping auto-generated variant');
+        return manuallyAddedVariants;
+      }
+      
       const variantId = 'variant-all'; // Single variant ID
       
       // Collect all selected value IDs from all attributes
@@ -1107,10 +1213,10 @@ function AddProductPageContent() {
         image: existingAutoVariant?.image || null,
       };
 
-      // Return manually added variants + auto-generated variant
-      const result = [...manuallyAddedVariants, autoVariant];
+      // Return only auto-generated variant (no manual variants)
+      const result = [autoVariant];
       console.log('✅ [VARIANT BUILDER] Variants updated:', {
-        manuallyAdded: manuallyAddedVariants.length,
+        manuallyAdded: 0,
         autoGenerated: 1,
         total: result.length
       });
@@ -2248,15 +2354,9 @@ function AddProductPageContent() {
               }
             }
 
-            // If category requires sizes, check if color has at least one size
-            if (categoryRequiresSizes) {
-              if (colorSizes.length === 0) {
-                alert(t('admin.products.add.variantSizeRequired').replace('{index}', variantIndex.toString()).replace('{color}', colorDataItem.colorLabel));
-                setLoading(false);
-                return;
-              }
-              
-              // Validate stock for each size of this color
+            // Size validation removed - attributes can work independently
+            // Validate stock for each size of this color (if sizes exist)
+            if (colorSizes.length > 0) {
               for (const size of colorSizes) {
                 const stock = colorSizeStocks[size];
                 if (!stock || stock.trim() === '' || parseInt(stock) < 0) {
@@ -2269,17 +2369,16 @@ function AddProductPageContent() {
                 }
               }
             } else {
-              // If category doesn't require sizes, validate base stock for color
-              if (colorSizes.length === 0) {
-                if (!colorDataItem.stock || colorDataItem.stock.trim() === '' || parseInt(colorDataItem.stock) < 0) {
-                  alert(t('admin.products.add.variantColorStockRequired').replace('{index}', variantIndex.toString()).replace('{color}', colorDataItem.colorLabel));
-                  setLoading(false);
-                  return;
-                }
+              // If no sizes, validate base stock for color
+              if (!colorDataItem.stock || colorDataItem.stock.trim() === '' || parseInt(colorDataItem.stock) < 0) {
+                alert(t('admin.products.add.variantColorStockRequired').replace('{index}', variantIndex.toString()).replace('{color}', colorDataItem.colorLabel));
+                setLoading(false);
+                return;
               }
             }
           }
         }
+        // No validation for variants without colors - attributes can work independently
       }
 
       // Prepare media array
@@ -2323,12 +2422,103 @@ function AddProductPageContent() {
       ].filter(m => m.url);
 
       // Prepare variants array
-      // Create variants for all combinations of colors and their sizes
-      // Each color has its own sizes, images, price, and stock
+      // NEW: Use generatedVariants if available (new format with attributes JSONB)
+      // Otherwise fallback to formData.variants (old format)
       const variants: any[] = [];
       const variantSkuSet = new Set<string>(); // Track SKUs during variant creation
       
-      formData.variants.forEach((variant, variantIndex) => {
+      // Check if we should use generatedVariants (new format)
+      const useGeneratedVariants = generatedVariants.length > 0 && selectedAttributesForVariants.size > 0;
+      
+      if (useGeneratedVariants) {
+        // NEW FORMAT: Create variants from generatedVariants (each variant has all attribute values)
+        console.log('📦 [ADMIN] Using generatedVariants format:', generatedVariants.length, 'variants');
+        console.log('🔍 [ADMIN] Selected attributes for variants:', Array.from(selectedAttributesForVariants));
+        const sizeAttribute = getSizeAttribute();
+        console.log('🔍 [ADMIN] Size attribute:', sizeAttribute ? { id: sizeAttribute.id, key: sizeAttribute.key } : 'not found');
+        
+        generatedVariants.forEach((genVariant, variantIndex) => {
+          // Convert prices from defaultCurrency to USD (database stores prices in USD)
+          const variantPriceUSD = convertPrice(parseFloat(genVariant.price || '0'), defaultCurrency, 'USD');
+          const variantCompareAtPriceUSD = genVariant.compareAtPrice 
+            ? convertPrice(parseFloat(genVariant.compareAtPrice), defaultCurrency, 'USD')
+            : undefined;
+          
+          // Generate SKU if not provided
+          let finalSku = genVariant.sku || undefined;
+          if (!finalSku || finalSku.trim() === '') {
+            const baseSlug = formData.slug || 'PROD';
+            finalSku = `${baseSlug.toUpperCase()}-${Date.now()}-${variantIndex + 1}`;
+          }
+          
+          // Ensure SKU is unique during creation
+          let uniqueSku = finalSku;
+          let skuCounter = 1;
+          while (variantSkuSet.has(uniqueSku)) {
+            uniqueSku = `${finalSku}-${skuCounter}`;
+            skuCounter++;
+          }
+          variantSkuSet.add(uniqueSku);
+          finalSku = uniqueSku;
+          
+          // Collect all attribute options for this variant from selectedValueIds
+          const variantOptions: Array<{ attributeKey: string; value: string; valueId?: string }> = [];
+          
+          // Group valueIds by attribute
+          const attributeValueMap: Record<string, Array<{ valueId: string; value: string }>> = {};
+          
+          console.log(`🔍 [ADMIN] Variant ${variantIndex + 1} selectedValueIds:`, genVariant.selectedValueIds);
+          
+          genVariant.selectedValueIds.forEach((valueId) => {
+            // Find which attribute this valueId belongs to
+            const attribute = attributes.find(a => 
+              a.values.some(v => v.id === valueId)
+            );
+            
+            if (attribute) {
+              const value = attribute.values.find(v => v.id === valueId);
+              if (value) {
+                console.log(`  ✅ Found attribute: ${attribute.key}, value: ${value.value}`);
+                if (!attributeValueMap[attribute.key]) {
+                  attributeValueMap[attribute.key] = [];
+                }
+                attributeValueMap[attribute.key].push({
+                  valueId: value.id,
+                  value: value.value,
+                });
+                
+                // Also add to variantOptions for backward compatibility
+                variantOptions.push({
+                  attributeKey: attribute.key,
+                  value: value.value,
+                  valueId: value.id,
+                });
+              }
+            } else {
+              console.warn(`  ⚠️ ValueId ${valueId} not found in any attribute`);
+            }
+          });
+          
+          console.log(`📦 [ADMIN] Variant ${variantIndex + 1} options:`, variantOptions);
+          
+          variants.push({
+            price: variantPriceUSD,
+            compareAtPrice: variantCompareAtPriceUSD,
+            stock: parseInt(genVariant.stock || '0') || 0,
+            sku: finalSku,
+            imageUrl: genVariant.image || undefined,
+            published: true,
+            options: variantOptions.length > 0 ? variantOptions : undefined,
+          });
+        });
+      } else {
+        // OLD FORMAT: Create variants from formData.variants (legacy support)
+        console.log('📦 [ADMIN] Using formData.variants format (legacy)');
+        console.log('🔍 [ADMIN] formData.variants count:', formData.variants.length);
+        const sizeAttribute = getSizeAttribute();
+        console.log('🔍 [ADMIN] Size attribute:', sizeAttribute ? { id: sizeAttribute.id, key: sizeAttribute.key } : 'not found');
+        
+        formData.variants.forEach((variant, variantIndex) => {
         // Convert prices from defaultCurrency to USD (database stores prices in USD)
         const variantPriceUSD = convertPrice(parseFloat(variant.price || '0'), defaultCurrency, 'USD');
         const baseVariantData: any = {
@@ -2560,83 +2750,166 @@ function AddProductPageContent() {
         });
         } else {
           // No colors - create variant without color
-          // But check if we have images from non-color attributes
-          let finalSku = variant.sku ? variant.sku.trim() : undefined;
-          if (!finalSku || finalSku === '') {
-            finalSku = formData.slug ? `${formData.slug.toUpperCase()}-${Date.now()}-${variantIndex + 1}` : undefined;
-          }
+          // Check if we have sizes in old format (variant.sizes) or need to handle sizes separately
+          const variantSizes = variant.sizes || [];
+          const variantSizeStocks = variant.sizeStocks || {};
           
-          // Ensure SKU is unique during creation
-          let uniqueSku = finalSku;
-          if (uniqueSku) {
-            let skuCounter = 1;
-            while (variantSkuSet.has(uniqueSku)) {
-              uniqueSku = `${finalSku}-${skuCounter}`;
-              skuCounter++;
-            }
-            variantSkuSet.add(uniqueSku);
-            finalSku = uniqueSku;
-          }
-          
-          const generatedSku = finalSku;
-          
-          // Check if we have any images from attribute values (for non-color, non-size attributes)
-          let variantImageUrl: string | undefined = undefined;
-          if (selectedAttributesForVariants.size > 0) {
-            const allAttributeImages: string[] = [];
-            Array.from(selectedAttributesForVariants).forEach((attributeId) => {
-              const attribute = attributes.find(a => a.id === attributeId);
-              if (!attribute || attribute.key === 'color' || attribute.key === 'size') return;
+          // If variant has sizes in old format, create variants for each size
+          if (variantSizes.length > 0) {
+            variantSizes.forEach((size, sizeIndex) => {
+              const stockForVariant = variantSizeStocks[size] || '0';
               
-              // Get selected value IDs for this attribute from generatedVariants
-              // Since we're in the old variant format, we need to check if there are any selected values
-              // For now, we'll collect images from all values of this attribute if it's selected
-              attribute.values.forEach((value) => {
-                if (value.imageUrl) {
-                  allAttributeImages.push(value.imageUrl);
+              const skuSuffix = variantSizes.length > 1 ? `-${sizeIndex + 1}` : '';
+              
+              // Generate SKU if not provided
+              let finalSku = variant.sku ? `${variant.sku.trim()}${skuSuffix}` : undefined;
+              if (!finalSku || finalSku === '') {
+                finalSku = formData.slug ? `${formData.slug.toUpperCase()}-${Date.now()}-${variantIndex + 1}-${sizeIndex + 1}` : undefined;
+              }
+              
+              // Ensure SKU is unique during creation
+              let uniqueSku = finalSku;
+              if (uniqueSku) {
+                let skuCounter = 1;
+                while (variantSkuSet.has(uniqueSku)) {
+                  uniqueSku = `${finalSku}-${skuCounter}`;
+                  skuCounter++;
                 }
+                variantSkuSet.add(uniqueSku);
+                finalSku = uniqueSku;
+              }
+              
+              // Convert prices from defaultCurrency to USD
+              const finalPrice = convertPrice(baseVariantData.price, defaultCurrency, 'USD');
+              const finalCompareAtPrice = baseVariantData.compareAtPrice 
+                ? convertPrice(baseVariantData.compareAtPrice, defaultCurrency, 'USD')
+                : undefined;
+              
+              // Collect all attribute options for this variant
+              const variantOptions: Array<{ attributeKey: string; value: string; valueId?: string }> = [];
+              
+              // Add size option
+              if (size && size.trim() !== '') {
+                const sizeAttr = attributes.find(a => a.key === 'size');
+                const sizeValue = sizeAttr?.values.find(v => v.value === size);
+                if (sizeValue) {
+                  variantOptions.push({ attributeKey: 'size', value: size, valueId: sizeValue.id });
+                } else {
+                  variantOptions.push({ attributeKey: 'size', value: size });
+                }
+              }
+              
+              // Add other attribute options from selectedAttributesForVariants (excluding color and size)
+              if (selectedAttributesForVariants.size > 0 && generatedVariants.length > 0) {
+                const genVariant = generatedVariants[0];
+                Array.from(selectedAttributesForVariants).forEach((attributeId) => {
+                  const attribute = attributes.find(a => a.id === attributeId);
+                  if (!attribute || attribute.key === 'color' || attribute.key === 'size') return;
+                  
+                  const selectedValueIds = genVariant.selectedValueIds.filter(id => 
+                    attribute.values.some(v => v.id === id)
+                  );
+                  
+                  selectedValueIds.forEach((valueId) => {
+                    const value = attribute.values.find(v => v.id === valueId);
+                    if (value) {
+                      variantOptions.push({ attributeKey: attribute.key, value: value.value, valueId: value.id });
+                    }
+                  });
+                });
+              }
+              
+              variants.push({
+                ...baseVariantData,
+                price: finalPrice,
+                compareAtPrice: finalCompareAtPrice,
+                size: size,
+                stock: parseInt(stockForVariant) || 0,
+                sku: finalSku,
+                options: variantOptions.length > 0 ? variantOptions : undefined,
               });
             });
+          } else {
+            // No colors and no sizes - create single variant without color and size
+            // But check if we have images from non-color attributes
+            let finalSku = variant.sku ? variant.sku.trim() : undefined;
+            if (!finalSku || finalSku === '') {
+              finalSku = formData.slug ? `${formData.slug.toUpperCase()}-${Date.now()}-${variantIndex + 1}` : undefined;
+            }
             
-            if (allAttributeImages.length > 0) {
-              variantImageUrl = allAttributeImages.join(',');
-              console.log('✅ [ADMIN] Added images from non-color attributes to variant:', variantImageUrl);
+            // Ensure SKU is unique during creation
+            let uniqueSku = finalSku;
+            if (uniqueSku) {
+              let skuCounter = 1;
+              while (variantSkuSet.has(uniqueSku)) {
+                uniqueSku = `${finalSku}-${skuCounter}`;
+                skuCounter++;
+              }
+              variantSkuSet.add(uniqueSku);
+              finalSku = uniqueSku;
             }
-          }
-          
-          // Collect all attribute options for this variant
-          const variantOptions: Array<{ attributeKey: string; value: string; valueId?: string }> = [];
-          
-          // Add all attribute options from selectedAttributesForVariants
-          if (selectedAttributesForVariants.size > 0 && generatedVariants.length > 0) {
-            const variant = generatedVariants[0];
-            Array.from(selectedAttributesForVariants).forEach((attributeId) => {
-              const attribute = attributes.find(a => a.id === attributeId);
-              if (!attribute) return;
-              
-              const selectedValueIds = variant.selectedValueIds.filter(id => 
-                attribute.values.some(v => v.id === id)
-              );
-              
-              selectedValueIds.forEach((valueId) => {
-                const value = attribute.values.find(v => v.id === valueId);
-                if (value) {
-                  variantOptions.push({ attributeKey: attribute.key, value: value.value, valueId: value.id });
-                }
+            
+            const generatedSku = finalSku;
+            
+            // Check if we have any images from attribute values (for non-color, non-size attributes)
+            let variantImageUrl: string | undefined = undefined;
+            if (selectedAttributesForVariants.size > 0) {
+              const allAttributeImages: string[] = [];
+              Array.from(selectedAttributesForVariants).forEach((attributeId) => {
+                const attribute = attributes.find(a => a.id === attributeId);
+                if (!attribute || attribute.key === 'color' || attribute.key === 'size') return;
+                
+                // Get selected value IDs for this attribute from generatedVariants
+                // Since we're in the old variant format, we need to check if there are any selected values
+                // For now, we'll collect images from all values of this attribute if it's selected
+                attribute.values.forEach((value) => {
+                  if (value.imageUrl) {
+                    allAttributeImages.push(value.imageUrl);
+                  }
+                });
               });
+              
+              if (allAttributeImages.length > 0) {
+                variantImageUrl = allAttributeImages.join(',');
+                console.log('✅ [ADMIN] Added images from non-color attributes to variant:', variantImageUrl);
+              }
+            }
+            
+            // Collect all attribute options for this variant
+            const variantOptions: Array<{ attributeKey: string; value: string; valueId?: string }> = [];
+            
+            // Add all attribute options from selectedAttributesForVariants
+            if (selectedAttributesForVariants.size > 0 && generatedVariants.length > 0) {
+              const genVariant = generatedVariants[0];
+              Array.from(selectedAttributesForVariants).forEach((attributeId) => {
+                const attribute = attributes.find(a => a.id === attributeId);
+                if (!attribute) return;
+                
+                const selectedValueIds = genVariant.selectedValueIds.filter(id => 
+                  attribute.values.some(v => v.id === id)
+                );
+                
+                selectedValueIds.forEach((valueId) => {
+                  const value = attribute.values.find(v => v.id === valueId);
+                  if (value) {
+                    variantOptions.push({ attributeKey: attribute.key, value: value.value, valueId: value.id });
+                  }
+                });
+              });
+            }
+            
+            variants.push({
+              ...baseVariantData,
+              color: undefined,
+              stock: 0,
+              sku: generatedSku,
+              imageUrl: variantImageUrl,
+              options: variantOptions.length > 0 ? variantOptions : undefined,
             });
           }
-          
-          variants.push({
-            ...baseVariantData,
-            color: undefined,
-            stock: 0,
-            sku: generatedSku,
-            imageUrl: variantImageUrl,
-            options: variantOptions.length > 0 ? variantOptions : undefined,
-          });
         }
       });
+      }
 
       // Final validation - ensure all SKUs are unique
       const finalSkuSet = new Set<string>();
@@ -2669,17 +2942,71 @@ function AddProductPageContent() {
       // Final validation - check size requirement for categories that require sizes
       const categoryRequiresSizesFinal = isClothingCategory();
       if (categoryRequiresSizesFinal && finalPrimaryCategoryId) {
-        const hasSizeInFinalVariants = variants.some(
-          (variant) => variant.size && variant.size.trim() !== ""
-        );
+        console.log('🔍 [VALIDATION] Checking size requirement for category:', finalPrimaryCategoryId);
+        console.log('📦 [VALIDATION] Total variants to check:', variants.length);
+        
+        // Check if any variant has size in options array (new format) or size field (old format)
+        const variantsWithSize: any[] = [];
+        const variantsWithoutSize: any[] = [];
+        
+        variants.forEach((variant, index) => {
+          let hasSize = false;
+          let sizeSource = '';
+          
+          // Old format: check variant.size field
+          if (variant.size && variant.size.trim() !== "") {
+            hasSize = true;
+            sizeSource = 'variant.size';
+          }
+          
+          // New format: check variant.options array for size attribute
+          if (!hasSize && variant.options && Array.isArray(variant.options)) {
+            const sizeOption = variant.options.find((opt: any) => {
+              return (opt.attributeKey === 'size' || opt.key === 'size' || opt.attribute === 'size') &&
+                     opt.value && opt.value.trim() !== "";
+            });
+            if (sizeOption) {
+              hasSize = true;
+              sizeSource = 'variant.options';
+            }
+          }
+          
+          if (hasSize) {
+            variantsWithSize.push({ index, variant, sizeSource });
+          } else {
+            variantsWithoutSize.push({ index, variant });
+          }
+        });
+        
+        console.log('✅ [VALIDATION] Variants with size:', variantsWithSize.length, variantsWithSize.map(v => ({
+          index: v.index,
+          size: v.variant.size,
+          options: v.variant.options,
+          source: v.sizeSource
+        })));
+        console.log('❌ [VALIDATION] Variants without size:', variantsWithoutSize.length, variantsWithoutSize.map(v => ({
+          index: v.index,
+          hasSizeField: !!v.variant.size,
+          hasOptions: !!v.variant.options,
+          options: v.variant.options
+        })));
 
-        if (!hasSizeInFinalVariants) {
-          console.error('❌ [VALIDATION] Final size validation failed. Variants:', variants);
-          alert('At least one size is required for this product category');
+        if (variantsWithSize.length === 0) {
+          console.error('❌ [VALIDATION] Final size validation failed. No variants have size.');
+          console.error('📋 [VALIDATION] All variants:', JSON.stringify(variants, null, 2));
+          console.error('🔍 [VALIDATION] Debug info:', {
+            totalVariants: variants.length,
+            useGeneratedVariants,
+            selectedAttributesForVariants: Array.from(selectedAttributesForVariants),
+            sizeAttribute: getSizeAttribute()?.id,
+            generatedVariantsCount: generatedVariants.length,
+            formDataVariantsCount: formData.variants.length
+          });
+          alert('Այս ապրանքի կատեգորիայի համար պահանջվում է առնվազն մեկ չափ: Խնդրում ենք ավելացնել չափեր ձեր ապրանքի տարբերակներին:\n\nAt least one size is required for this product category. Please add sizes to your product variants.');
           setLoading(false);
           return;
         }
-        console.log('✅ [VALIDATION] Final size validation passed');
+        console.log('✅ [VALIDATION] Final size validation passed. Found', variantsWithSize.length, 'variant(s) with size.');
       } else {
         console.log('ℹ️ [VALIDATION] Size validation skipped (category does not require sizes)');
       }
@@ -2785,7 +3112,7 @@ function AddProductPageContent() {
       variants.forEach(variant => {
         if (variant.imageUrl) {
           // imageUrl can be comma-separated string
-          const imageUrls = variant.imageUrl.split(',').map(url => url.trim()).filter(Boolean);
+          const imageUrls = variant.imageUrl.split(',').map((url: string) => url.trim()).filter(Boolean);
           variantImages.push(...imageUrls);
         }
       });
@@ -2814,7 +3141,7 @@ function AddProductPageContent() {
       let variantImageIndex = 0;
       variants.forEach(variant => {
         if (variant.imageUrl) {
-          const imageUrls = variant.imageUrl.split(',').map(url => url.trim()).filter(Boolean);
+          const imageUrls = variant.imageUrl.split(',').map((url: string) => url.trim()).filter(Boolean);
           const processedUrls = processedVariantImages.slice(variantImageIndex, variantImageIndex + imageUrls.length);
           variant.imageUrl = processedUrls.join(',');
           variantImageIndex += imageUrls.length;
