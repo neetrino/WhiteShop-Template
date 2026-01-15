@@ -13,7 +13,8 @@
     "start": "turbo run start",
     "migrate:mongo-to-postgres": "tsx scripts/migrate-mongo-to-postgres.ts",
     "create-admin": "tsx scripts/create-admin.ts",
-    "deploy:neon-migrations": "tsx scripts/deploy-neon-migrations.ts"
+    "deploy:neon-migrations": "tsx scripts/deploy-neon-migrations.ts",
+    "setup:neon-db": "tsx scripts/setup-neon-db.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3"
