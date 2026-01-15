@@ -3,6 +3,12 @@ import { Prisma } from "@prisma/client";
 import { adminService } from "./admin.service";
 import { translations } from "../translations";
 import { ensureProductVariantAttributesColumn } from "../utils/db-ensure";
+import {
+  processImageUrl,
+  smartSplitUrls,
+  cleanImageUrls,
+  separateMainAndVariantImages,
+} from "../utils/image-utils";
 
 interface ProductFilters {
   category?: string;
@@ -810,12 +816,16 @@ class ProductsService {
         originalPrice: appliedDiscount > 0 ? originalPrice : variant?.compareAtPrice || null,
         compareAtPrice: variant?.compareAtPrice || null,
         discountPercent: appliedDiscount > 0 ? appliedDiscount : null,
-        image:
-          Array.isArray(product.media) && product.media[0]
-            ? typeof product.media[0] === "string"
-              ? product.media[0]
-              : (product.media[0] as any).url
-            : null,
+        image: (() => {
+          // Use unified image utilities to get first valid main image
+          if (!Array.isArray(product.media) || product.media.length === 0) {
+            return null;
+          }
+          
+          // Process first image
+          const firstImage = processImageUrl(product.media[0]);
+          return firstImage || null;
+        })(),
         inStock: (variant?.stock || 0) > 0,
         labels: (() => {
           // Map existing labels
@@ -1676,7 +1686,39 @@ class ProductsService {
           title: catTranslation?.title || "",
         };
       }) : [],
-      media: Array.isArray(product.media) ? product.media : [],
+      media: (() => {
+        // Use unified image utilities for consistent processing
+        if (!Array.isArray(product.media)) {
+          console.log('📸 [PRODUCTS SERVICE] Product media is not an array, returning empty array');
+          return [];
+        }
+        
+        // Collect all variant images for separation
+        const variantImages: any[] = [];
+        if (Array.isArray(product.variants) && product.variants.length > 0) {
+          product.variants.forEach((variant: any) => {
+            if (variant.imageUrl) {
+              // Use smartSplitUrls to handle comma-separated and base64 images
+              const urls = smartSplitUrls(variant.imageUrl);
+              variantImages.push(...urls);
+            }
+          });
+        }
+        
+        // Separate main images from variant images using unified utility
+        const { main } = separateMainAndVariantImages(product.media, variantImages);
+        
+        // Clean and validate final main images
+        const cleanedMain = cleanImageUrls(main);
+        
+        console.log('📸 [PRODUCTS SERVICE] Main media images count (after cleanup):', cleanedMain.length);
+        console.log('📸 [PRODUCTS SERVICE] Variant images excluded:', variantImages.length);
+        if (cleanedMain.length > 0) {
+          console.log('📸 [PRODUCTS SERVICE] Main media (first 3):', cleanedMain.slice(0, 3).map((img: string) => img.substring(0, 50)));
+        }
+        
+        return cleanedMain;
+      })(),
       labels: (() => {
         // Map existing labels
         const existingLabels = Array.isArray(product.labels) ? product.labels.map((label: { id: string; type: string; value: string; position: string; color: string | null }) => ({
@@ -1734,6 +1776,22 @@ class ProductsService {
             finalPrice = originalPrice * (1 - actualDiscount / 100);
           }
 
+          // Process and clean variant imageUrl
+          let variantImageUrl: string | null = null;
+          if (variant.imageUrl) {
+            // Use smartSplitUrls to handle comma-separated URLs
+            const urls = smartSplitUrls(variant.imageUrl);
+            // Process and validate each URL
+            const processedUrls = urls.map(url => processImageUrl(url)).filter((url): url is string => url !== null);
+            // Use first valid URL, or join if multiple (comma-separated)
+            variantImageUrl = processedUrls.length > 0 ? processedUrls.join(',') : null;
+          }
+          
+          // Log variant image for verification
+          if (variantImageUrl) {
+            console.log(`📸 [PRODUCTS SERVICE] Variant ${variant.id} (SKU: ${variant.sku}) has imageUrl:`, variantImageUrl.substring(0, 50) + (variantImageUrl.length > 50 ? '...' : ''));
+          }
+          
           return {
             id: variant.id,
             sku: variant.sku || "",
@@ -1743,7 +1801,7 @@ class ProductsService {
             globalDiscount: globalDiscount > 0 ? globalDiscount : null,
             productDiscount: productDiscount > 0 ? productDiscount : null,
             stock: variant.stock,
-            imageUrl: variant.imageUrl || null,
+            imageUrl: variantImageUrl,
             options: Array.isArray(variant.options) ? variant.options.map((opt: any) => {
               // Support both new format (AttributeValue) and old format (attributeKey/value)
               if (opt.attributeValue) {

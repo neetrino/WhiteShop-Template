@@ -3,6 +3,12 @@ import { db } from "@white-shop/db";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { findOrCreateAttributeValue } from "../utils/variant-generator";
 import { ensureProductAttributesTable, ensureProductVariantAttributesColumn } from "../utils/db-ensure";
+import {
+  processImageUrl,
+  smartSplitUrls,
+  cleanImageUrls,
+  separateMainAndVariantImages,
+} from "../utils/image-utils";
 
 class AdminService {
   /**
@@ -1486,12 +1492,22 @@ class AdminService {
 
             console.log(`📦 [ADMIN SERVICE] Variant ${variantIndex + 1} attributes:`, JSON.stringify(attributesJson, null, 2));
 
+            // Process and validate variant imageUrl
+            let processedVariantImageUrl: string | undefined = undefined;
+            if (variant.imageUrl) {
+              const urls = smartSplitUrls(variant.imageUrl);
+              const processedUrls = urls.map(url => processImageUrl(url)).filter((url): url is string => url !== null);
+              if (processedUrls.length > 0) {
+                processedVariantImageUrl = processedUrls.join(',');
+              }
+            }
+
             return {
               sku: uniqueSku,
               price,
               compareAtPrice,
               stock: isNaN(stock) ? 0 : stock,
-              imageUrl: variant.imageUrl || undefined,
+              imageUrl: processedVariantImageUrl,
               published: variant.published !== false,
               attributes: attributesJson, // JSONB column
               options: {
@@ -1517,30 +1533,46 @@ class AdminService {
         
         console.log('✅ [ADMIN SERVICE] All variant SKUs are unique');
 
+        // Collect all variant images to exclude from main media
+        const allVariantImages: any[] = [];
+        variantsData.forEach((variant: any) => {
+          if (variant.imageUrl) {
+            const urls = smartSplitUrls(variant.imageUrl);
+            allVariantImages.push(...urls);
+          }
+        });
+
         // Prepare media array - use mainProductImage if provided and media is empty
-        let finalMedia = data.media || [];
-        if (data.mainProductImage && finalMedia.length === 0) {
+        let rawMedia = data.media || [];
+        if (data.mainProductImage && rawMedia.length === 0) {
           // If mainProductImage is provided but media is empty, use mainProductImage as first media item
-          finalMedia = [data.mainProductImage];
+          rawMedia = [data.mainProductImage];
           console.log('📸 [ADMIN SERVICE] Using mainProductImage as media:', data.mainProductImage.substring(0, 50) + '...');
-        } else if (data.mainProductImage && finalMedia.length > 0) {
+        } else if (data.mainProductImage && rawMedia.length > 0) {
           // If both are provided, ensure mainProductImage is first in media array
-          const mainImageIndex = finalMedia.findIndex((m: any) => {
+          const mainImageIndex = rawMedia.findIndex((m: any) => {
             const url = typeof m === 'string' ? m : m.url;
             return url === data.mainProductImage;
           });
           if (mainImageIndex === -1) {
             // mainProductImage not in media array, add it as first
-            finalMedia = [data.mainProductImage, ...finalMedia];
+            rawMedia = [data.mainProductImage, ...rawMedia];
             console.log('📸 [ADMIN SERVICE] Added mainProductImage as first media item');
           } else if (mainImageIndex > 0) {
             // mainProductImage is in media but not first, move it to first
-            const mainImage = finalMedia[mainImageIndex];
-            finalMedia.splice(mainImageIndex, 1);
-            finalMedia.unshift(mainImage);
+            const mainImage = rawMedia[mainImageIndex];
+            rawMedia.splice(mainImageIndex, 1);
+            rawMedia.unshift(mainImage);
             console.log('📸 [ADMIN SERVICE] Moved mainProductImage to first position in media');
           }
         }
+
+        // Separate main images from variant images and clean them
+        const { main } = separateMainAndVariantImages(rawMedia, allVariantImages);
+        const finalMedia = cleanImageUrls(main);
+        
+        console.log('📸 [ADMIN SERVICE] Final main media count:', finalMedia.length);
+        console.log('📸 [ADMIN SERVICE] Variant images excluded:', allVariantImages.length);
 
         const product = await tx.product.create({
           data: {
@@ -1761,12 +1793,41 @@ class AdminService {
 
       // Execute everything in a transaction for atomicity and speed
       const result = await db.$transaction(async (tx: any) => {
+        // Collect all variant images to exclude from main media (if media is being updated)
+        let allVariantImages: any[] = [];
+        if (data.variants !== undefined) {
+          data.variants.forEach((variant: any) => {
+            if (variant.imageUrl) {
+              const urls = smartSplitUrls(variant.imageUrl);
+              allVariantImages.push(...urls);
+            }
+          });
+        } else {
+          // If variants not being updated, get existing variant images
+          const existingVariants = await tx.productVariant.findMany({
+            where: { productId },
+            select: { imageUrl: true },
+          });
+          existingVariants.forEach((variant: any) => {
+            if (variant.imageUrl) {
+              const urls = smartSplitUrls(variant.imageUrl);
+              allVariantImages.push(...urls);
+            }
+          });
+        }
+
         // 1. Update product base data
         const updateData: any = {};
         if (data.brandId !== undefined) updateData.brandId = data.brandId || null;
         if (data.primaryCategoryId !== undefined) updateData.primaryCategoryId = data.primaryCategoryId || null;
         if (data.categoryIds !== undefined) updateData.categoryIds = data.categoryIds || [];
-        if (data.media !== undefined) updateData.media = data.media;
+        if (data.media !== undefined) {
+          // Separate main images from variant images and clean them
+          const { main } = separateMainAndVariantImages(data.media, allVariantImages);
+          updateData.media = cleanImageUrls(main);
+          console.log('📸 [ADMIN SERVICE] Updated main media count:', updateData.media.length);
+          console.log('📸 [ADMIN SERVICE] Variant images excluded:', allVariantImages.length);
+        }
         if (data.published !== undefined) {
           updateData.published = data.published;
           if (data.published && !existing.publishedAt) {
@@ -2012,6 +2073,16 @@ class AdminService {
                   where: { variantId: variantToUpdate.id },
                 });
                 
+                // Process and validate variant imageUrl
+                let processedVariantImageUrl: string | undefined = undefined;
+                if (variant.imageUrl) {
+                  const urls = smartSplitUrls(variant.imageUrl);
+                  const processedUrls = urls.map(url => processImageUrl(url)).filter((url): url is string => url !== null);
+                  if (processedUrls.length > 0) {
+                    processedVariantImageUrl = processedUrls.join(',');
+                  }
+                }
+
                 await tx.productVariant.update({
                   where: { id: variantIdToUse },
                   data: {
@@ -2019,7 +2090,7 @@ class AdminService {
                     price,
                     compareAtPrice,
                     stock: isNaN(stock) ? 0 : stock,
-                    imageUrl: variant.imageUrl || undefined,
+                    imageUrl: processedVariantImageUrl,
                     published: variant.published !== false,
                     attributes: attributesJson,
                     options: {
@@ -2046,6 +2117,16 @@ class AdminService {
                   }
                 }
                 
+                // Process and validate variant imageUrl
+                let processedVariantImageUrl: string | undefined = undefined;
+                if (variant.imageUrl) {
+                  const urls = smartSplitUrls(variant.imageUrl);
+                  const processedUrls = urls.map(url => processImageUrl(url)).filter((url): url is string => url !== null);
+                  if (processedUrls.length > 0) {
+                    processedVariantImageUrl = processedUrls.join(',');
+                  }
+                }
+
                 console.log(`🆕 [ADMIN SERVICE] Creating new variant with SKU: ${variant.sku || 'none'}`);
                 const newVariant = await tx.productVariant.create({
                   data: {
@@ -2054,7 +2135,7 @@ class AdminService {
                     price,
                     compareAtPrice,
                     stock: isNaN(stock) ? 0 : stock,
-                    imageUrl: variant.imageUrl || undefined,
+                    imageUrl: processedVariantImageUrl,
                     published: variant.published !== false,
                     attributes: attributesJson,
                     options: {

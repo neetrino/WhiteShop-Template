@@ -9,6 +9,12 @@ import { apiClient } from '../../../../lib/api-client';
 import { getColorHex, COLOR_MAP } from '../../../../lib/colorMap';
 import { useTranslation } from '../../../../lib/i18n-client';
 import { convertPrice, CURRENCIES, type CurrencyCode } from '../../../../lib/currency';
+import {
+  processImageUrl,
+  smartSplitUrls,
+  cleanImageUrls,
+  separateMainAndVariantImages,
+} from '../../../../lib/utils/image-utils';
 
 // Component for adding new color/size
 function NewColorSizeInput({ 
@@ -789,26 +795,17 @@ function AddProductPageContent() {
 
           const mediaList = product.media || [];
           console.log('🖼️ [ADMIN] Loading main media images. Total media:', mediaList.length);
-          // IMPORTANT: In edit mode, show ALL main media images, even if they also exist in variants
-          // This allows users to see and manage all main images they originally added
-          // Variant images will be shown separately in their respective variants
-          const normalizedMedia = Array.isArray(mediaList)
-            ? mediaList
-                .map((item: any) => {
-                  if (typeof item === 'string') {
-                    return item;
-                  } else if (item && typeof item === 'object') {
-                    return item?.url || item?.src || item?.value || '';
-                  }
-                  return '';
-                })
-                .filter((url: string) => {
-                  if (!url || url.trim() === '') return false;
-                  console.log(`  ✅ Keeping main image (length: ${url.length})`);
-                  return true;
-                })
-            : [];
-          console.log(`🖼️ [ADMIN] Main media loaded: ${normalizedMedia.length} images`);
+          
+          // Use unified utilities to properly separate and clean images
+          // In edit mode, we show main images separately from variant images
+          // product.media is already cleaned in findBySlug, but we ensure proper separation here
+          const { main } = separateMainAndVariantImages(
+            Array.isArray(mediaList) ? mediaList : [],
+            variantImages.size > 0 ? Array.from(variantImages) : []
+          );
+          
+          const normalizedMedia = cleanImageUrls(main);
+          console.log(`🖼️ [ADMIN] Main media loaded: ${normalizedMedia.length} images (after separation from ${variantImages.size} variant images)`);
           
           // Find featured image index from original mediaList (before filtering)
           const featuredIndexFromApi = Array.isArray(mediaList)
@@ -2385,44 +2382,20 @@ function AddProductPageContent() {
       }
 
       // Prepare media array
-      const allColorImages: { url: string; isFeatured: boolean }[] = [];
-      formData.variants.forEach((v) => {
-        v.colors.forEach((c) => {
-          if (c.images && c.images.length > 0) {
-            c.images.forEach((url, idx) => {
-              allColorImages.push({
-                url,
-                // A color image is "featured" if the color itself is featured AND it's the first image of that color
-                isFeatured: !!c.isFeatured && idx === 0
-              });
-            });
-          }
-        });
-      });
-
-      // Sort allColorImages so that featured images come first
-      allColorImages.sort((a, b) => (a.isFeatured === b.isFeatured ? 0 : a.isFeatured ? -1 : 1));
-
-      // If no color image is featured, but we have color images, make the first one featured
-      const hasFeaturedColorImage = allColorImages.some(img => img.isFeatured);
-      if (!hasFeaturedColorImage && allColorImages.length > 0) {
-        allColorImages[0].isFeatured = true;
-      }
-
-      const media = [
-        ...formData.imageUrls.map((url, index) => ({
+      // STRICT: Main media should ONLY contain formData.imageUrls (main product images)
+      // Color images should NOT be added to main media - they belong only in variant.imageUrl
+      const media = formData.imageUrls
+        .map((url, index) => ({
           url: url.trim(),
           type: 'image',
           position: index,
-          isFeatured: index === 0 && allColorImages.length === 0,
-        })),
-        ...allColorImages.map((img, index) => ({
-          url: img.url.trim(),
-          type: 'image',
-          position: formData.imageUrls.length + index,
-          isFeatured: img.isFeatured,
+          isFeatured: index === 0, // First image is featured
         }))
-      ].filter(m => m.url);
+        .filter(m => m.url);
+      
+      console.log('📸 [ADMIN] Main media images count:', media.length);
+      console.log('📸 [ADMIN] Main media (first 3):', media.slice(0, 3).map(m => m.url.substring(0, 50)));
+      console.log('📸 [ADMIN] Color images will be stored ONLY in variant.imageUrl, NOT in main media');
 
       // Prepare variants array
       // NEW: Use generatedVariants if available (new format with attributes JSONB)

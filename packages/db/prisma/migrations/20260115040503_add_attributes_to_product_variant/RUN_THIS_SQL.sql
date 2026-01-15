@@ -7,3 +7,4 @@ ALTER TABLE "product_variants" ADD COLUMN IF NOT EXISTS "attributes" JSONB;
 -- The Prisma client will automatically recognize the new column
 
 
+

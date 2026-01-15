@@ -14,6 +14,13 @@ import { ProductReviews } from '../../../components/ProductReviews';
 import { Heart, Minus, Plus, Maximize2 } from 'lucide-react';
 import { CompareIcon } from '../../../components/icons/CompareIcon';
 import { ProductLabels } from '../../../components/ProductLabels';
+import {
+  processImageUrl,
+  smartSplitUrls,
+  normalizeUrlForComparison,
+  cleanImageUrls,
+  separateMainAndVariantImages,
+} from '../../../lib/utils/image-utils';
 
 interface ProductPageProps {
   params: Promise<{ slug?: string }>;
@@ -125,237 +132,49 @@ export default function ProductPage({ params }: ProductPageProps) {
   const [reviews, setReviews] = useState<Array<{ rating: number }>>([]);
   const thumbnailsPerView = 3;
 
-  // Unified image processing helper - DEFINED FIRST
-  const processImageUrl = useCallback((url: any): string | null => {
-    if (!url) return null;
-    
-    let finalUrl = '';
-    if (typeof url === 'string') {
-      finalUrl = url.trim();
-    } else if (typeof url === 'object') {
-      finalUrl = (url.url || url.src || '').trim();
-    }
-    
-    if (!finalUrl) return null;
-    
-    if (finalUrl.startsWith('http') || finalUrl.startsWith('data:')) {
-      return finalUrl;
-    }
-    
-    if (finalUrl.startsWith('/')) {
-      return finalUrl;
-    }
-    
-    return `/${finalUrl}`;
-  }, []);
+  // Use unified image utilities (imported from image-utils.ts)
 
-  /**
-   * Smart split for comma-separated image URLs that handles Base64 data URIs
-   */
-  const smartSplitUrls = useCallback((str: string | null | undefined): string[] => {
-    if (!str) return [];
-    if (!str.includes('data:')) {
-      return str.split(',').map(s => s.trim()).filter(Boolean);
-    }
-    
-    const parts = str.split(',');
-    const results: string[] = [];
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i].trim();
-      if (part.startsWith('data:')) {
-        if (i + 1 < parts.length) {
-          results.push(part + ',' + parts[i + 1].trim());
-          i++;
-        } else {
-          results.push(part);
-        }
-      } else if (part) {
-        results.push(part);
-      }
-    }
-    return results;
-  }, []);
-
-  // Get images array from product - DEFINED SECOND
+  // Get images array from product - using unified utilities
+  // Note: product.media is already cleaned and separated from variant images by findBySlug
   const images = useMemo(() => {
     if (!product) return [];
     
     console.log('🖼️ [PRODUCT IMAGES] Building images array for product:', product.id);
-    console.log('🖼️ [PRODUCT IMAGES] product.media:', product.media);
-    console.log('🖼️ [PRODUCT IMAGES] product.media type:', typeof product.media, Array.isArray(product.media));
     
-    // First, collect all attribute value imageUrls to exclude them from product images
-    // Attribute value images should NOT appear in the main gallery
-    const attributeValueImageUrls = new Set<string>();
-    if (product.productAttributes && Array.isArray(product.productAttributes)) {
-      product.productAttributes.forEach((productAttr) => {
-        if (productAttr.attribute?.values && Array.isArray(productAttr.attribute.values)) {
-          productAttr.attribute.values.forEach((val: { imageUrl?: string | null }) => {
-            if (val.imageUrl) {
-              const processed = processImageUrl(val.imageUrl);
-              if (processed) {
-                attributeValueImageUrls.add(processed);
-                // Also add normalized versions for comparison
-                if (processed.startsWith('/')) {
-                  attributeValueImageUrls.add(processed.substring(1));
-                } else {
-                  attributeValueImageUrls.add(`/${processed}`);
-                }
-              }
-            }
-          });
-        }
+    // Collect all variant images
+    const variantImages: any[] = [];
+    if (product.variants && Array.isArray(product.variants)) {
+      // Sort variants by position for consistent order
+      const sortedVariants = [...product.variants].sort((a, b) => {
+        const aPos = (a as any).position ?? 0;
+        const bPos = (b as any).position ?? 0;
+        return aPos - bPos;
       });
-    }
-    
-    // Helper to check if a URL matches any attribute value image
-    const isAttributeValueImage = (url: string): boolean => {
-      const processed = processImageUrl(url);
-      if (!processed) return false;
       
-      const normalized = processed.startsWith('/') ? processed : `/${processed}`;
-      const withoutSlash = processed.startsWith('/') ? processed.substring(1) : processed;
-      
-      return attributeValueImageUrls.has(processed) || 
-             attributeValueImageUrls.has(normalized) || 
-             attributeValueImageUrls.has(withoutSlash);
-    };
-    
-    const allRawImages: any[] = [];
-    
-    // 1. Add general product media first (main product images)
-    if (product.media) {
-      console.log('🖼️ [PRODUCT IMAGES] Processing product.media, type:', typeof product.media, 'isArray:', Array.isArray(product.media));
-      
-      if (Array.isArray(product.media)) {
-        console.log('🖼️ [PRODUCT IMAGES] Processing product.media array, length:', product.media.length);
-        product.media.forEach((mediaItem, index) => {
-          console.log(`🖼️ [PRODUCT IMAGES] mediaItem[${index}]:`, mediaItem, 'type:', typeof mediaItem);
-          
-          if (typeof mediaItem === 'string') {
-            // Handle string items - could be single URL or comma-separated
-            if (mediaItem.includes(',')) {
-              // Comma-separated URLs
-              const urls = smartSplitUrls(mediaItem);
-              urls.forEach(url => {
-                if (url.trim()) {
-                  console.log(`🖼️ [PRODUCT IMAGES] Adding comma-separated URL:`, url);
-                  allRawImages.push(url.trim());
-                }
-              });
-            } else {
-              console.log(`🖼️ [PRODUCT IMAGES] Adding string media item:`, mediaItem);
-              allRawImages.push(mediaItem);
-            }
-          } else if (mediaItem && typeof mediaItem === 'object') {
-            // Handle object items
-            const url = (mediaItem as any).url || (mediaItem as any).src || (mediaItem as any).value || '';
-            console.log(`🖼️ [PRODUCT IMAGES] Processing object media item, url:`, url);
-            if (url) {
-              if (typeof url === 'string' && url.includes(',')) {
-                // Comma-separated URLs in object
-                const urls = smartSplitUrls(url);
-                urls.forEach(u => {
-                  if (u.trim()) {
-                    allRawImages.push(u.trim());
-                  }
-                });
-              } else {
-                allRawImages.push(url);
-              }
-            }
-          }
-        });
-      } else if (typeof product.media === 'string') {
-        // Handle single string (could be comma-separated)
-        const mediaString = product.media as string;
-        console.log('🖼️ [PRODUCT IMAGES] Processing single string media:', mediaString);
-        if (mediaString.includes(',')) {
-          const urls = smartSplitUrls(mediaString);
-          urls.forEach(url => {
-            if (url.trim()) {
-              console.log('🖼️ [PRODUCT IMAGES] Adding comma-separated URL:', url);
-              allRawImages.push(url.trim());
-            }
-          });
-        } else {
-          allRawImages.push(mediaString);
-        }
-      } else if (typeof product.media === 'object') {
-        // Handle single object
-        console.log('🖼️ [PRODUCT IMAGES] Processing single object media');
-        const url = (product.media as any).url || (product.media as any).src || (product.media as any).value || '';
-        if (url) {
-          if (typeof url === 'string' && url.includes(',')) {
-            const urls = smartSplitUrls(url);
-            urls.forEach(u => {
-              if (u.trim()) {
-                allRawImages.push(u.trim());
-              }
-            });
-          } else {
-            allRawImages.push(url);
-          }
-        }
-      }
-    }
-    
-    // 2. Add variant images, but EXCLUDE those that match attribute value images
-    // Variant images that are the same as attribute value images should NOT appear in gallery
-    // IMPORTANT: Process variant images properly to handle comma-separated URLs and base64
-    if (product.variants) {
-      product.variants.forEach(v => {
+      sortedVariants.forEach((v) => {
         if (v.imageUrl) {
-          // Use smartSplitUrls to properly handle comma-separated URLs and base64
-          const split = smartSplitUrls(v.imageUrl);
-          split.forEach((url: string) => {
-            if (!url || url.trim() === '') return;
-            
-            // Process the URL first to normalize it
-            const processed = processImageUrl(url);
-            if (!processed) return;
-            
-            // Only add variant image if it's NOT an attribute value image
-            // This ensures attribute value images don't appear in the main gallery
-            if (!isAttributeValueImage(processed)) {
-              allRawImages.push(processed);
-              console.log(`🖼️ [PRODUCT IMAGES] Added variant image: ${processed.substring(0, 50)}...`);
-            } else {
-              console.log(`🖼️ [PRODUCT IMAGES] Skipped variant image (attribute value): ${processed.substring(0, 50)}...`);
-            }
-          });
+          const urls = smartSplitUrls(v.imageUrl);
+          variantImages.push(...urls);
         }
       });
     }
-
-    console.log('🖼️ [PRODUCT IMAGES] allRawImages before processing:', allRawImages);
     
-    // Process all images (main + variant) and remove duplicates
-    const processedImages = allRawImages
-      .map(processImageUrl)
-      .filter((url): url is string => url !== null);
+    // Use unified utility to separate and clean images
+    // product.media is already cleaned in findBySlug, but we do final separation here
+    const { main, variants: variantOnly } = separateMainAndVariantImages(
+      Array.isArray(product.media) ? product.media : [],
+      variantImages
+    );
     
-    // Remove duplicates while preserving order
-    const uniqueImages = Array.from(new Set(processedImages));
+    // Combine main images first, then variant-only images
+    const allImages = [...cleanImageUrls(main), ...cleanImageUrls(variantOnly)];
     
-    console.log('🖼️ [PRODUCT IMAGES] processedImages:', uniqueImages);
+    console.log('🖼️ [PRODUCT IMAGES] Final images count:', allImages.length);
+    console.log('🖼️ [PRODUCT IMAGES] Main images:', cleanImageUrls(main).length);
+    console.log('🖼️ [PRODUCT IMAGES] Variant-only images:', cleanImageUrls(variantOnly).length);
     
-    // Final filter: remove any attribute value images that might have been added
-    const filteredImages = uniqueImages.filter(url => {
-      if (isAttributeValueImage(url)) {
-        return false;
-      }
-      return true;
-    });
-    
-    console.log('🖼️ [PRODUCT IMAGES] filteredImages (final):', filteredImages);
-    
-    // Return all unique images (attribute value images are excluded)
-    // Ensure product main images come first
-    const finalImages = Array.from(new Set(filteredImages));
-    console.log('🖼️ [PRODUCT IMAGES] Final images array:', finalImages);
-    return finalImages;
-  }, [product, processImageUrl, smartSplitUrls]);
+    return allImages;
+  }, [product]);
 
   // Helper function to get color hex/rgb from color name
   const getColorValue = (colorName: string): string => {
