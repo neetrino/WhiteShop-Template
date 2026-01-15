@@ -23,7 +23,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState<Settings>({
-    defaultCurrency: 'USD',
+    defaultCurrency: 'AMD',
     currencyRates: {
       USD: 1,
       AMD: 400,
@@ -54,7 +54,7 @@ export default function SettingsPage() {
       console.log('⚙️ [ADMIN] Fetching settings...');
       const data = await apiClient.get<Settings>('/api/v1/admin/settings');
       setSettings({
-        defaultCurrency: data.defaultCurrency || 'USD',
+        defaultCurrency: data.defaultCurrency || 'AMD',
         globalDiscount: data.globalDiscount,
         categoryDiscounts: data.categoryDiscounts,
         brandDiscounts: data.brandDiscounts,
@@ -71,7 +71,7 @@ export default function SettingsPage() {
       console.error('❌ [ADMIN] Error fetching settings:', err);
       // Use defaults if error
       setSettings({
-        defaultCurrency: 'USD',
+        defaultCurrency: 'AMD',
         currencyRates: {
           USD: 1,
           AMD: 400,
@@ -194,7 +194,7 @@ export default function SettingsPage() {
                 {t('admin.settings.defaultCurrency')}
               </label>
               <select 
-                value={settings.defaultCurrency || 'USD'}
+                value={settings.defaultCurrency || 'AMD'}
                 onChange={(e) => setSettings({ ...settings, defaultCurrency: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >

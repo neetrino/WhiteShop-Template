@@ -2448,7 +2448,7 @@ class AdminService {
       globalDiscount: globalDiscountSetting ? Number(globalDiscountSetting.value) : 0,
       categoryDiscounts: categoryDiscountsSetting ? (categoryDiscountsSetting.value as Record<string, number>) : {},
       brandDiscounts: brandDiscountsSetting ? (brandDiscountsSetting.value as Record<string, number>) : {},
-      defaultCurrency: defaultCurrencySetting ? (defaultCurrencySetting.value as string) : 'USD',
+      defaultCurrency: defaultCurrencySetting ? (defaultCurrencySetting.value as string) : 'AMD',
       currencyRates: currencyRatesSetting ? (currencyRatesSetting.value as Record<string, number>) : defaultCurrencyRates,
     };
   }

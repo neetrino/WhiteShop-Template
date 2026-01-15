@@ -212,7 +212,7 @@ function AddProductPageContent() {
   // Track which attributes have been selected (have values added to them)
   const [selectedAttributesForProduct, setSelectedAttributesForProduct] = useState<Set<string>>(new Set());
   // Default currency from settings
-  const [defaultCurrency, setDefaultCurrency] = useState<CurrencyCode>('USD');
+  const [defaultCurrency, setDefaultCurrency] = useState<CurrencyCode>('AMD');
   
   // New Multi-Attribute Variant Builder state
   const [selectedAttributesForVariants, setSelectedAttributesForVariants] = useState<Set<string>>(new Set()); // Selected attribute IDs
@@ -260,15 +260,15 @@ function AddProductPageContent() {
     const loadDefaultCurrency = async () => {
       try {
         const settingsRes = await apiClient.get<{ defaultCurrency?: string }>('/api/v1/admin/settings');
-        const currency = (settingsRes.defaultCurrency || 'USD') as CurrencyCode;
+        const currency = (settingsRes.defaultCurrency || 'AMD') as CurrencyCode;
         if (currency in CURRENCIES) {
           setDefaultCurrency(currency);
           console.log('✅ [ADMIN] Default currency loaded:', currency);
         }
       } catch (err) {
         console.error('❌ [ADMIN] Error loading default currency:', err);
-        // Use USD as default
-        setDefaultCurrency('USD');
+        // Use AMD as default
+        setDefaultCurrency('AMD');
       }
     };
     

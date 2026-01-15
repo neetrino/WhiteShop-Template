@@ -65,7 +65,7 @@ export function clearCurrencyRatesCache(): void {
 const CURRENCY_STORAGE_KEY = 'shop_currency';
 
 export function getStoredCurrency(): CurrencyCode {
-  if (typeof window === 'undefined') return 'USD';
+  if (typeof window === 'undefined') return 'AMD';
   try {
     const stored = localStorage.getItem(CURRENCY_STORAGE_KEY);
     if (stored && stored in CURRENCIES) {
@@ -74,7 +74,7 @@ export function getStoredCurrency(): CurrencyCode {
   } catch {
     // Ignore errors
   }
-  return 'USD';
+  return 'AMD';
 }
 
 export function setStoredCurrency(currency: CurrencyCode): void {
