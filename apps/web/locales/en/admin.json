@@ -188,7 +188,10 @@
     "errorUpdating": "Error updating category",
     "deleteConfirm": "Are you sure you want to delete category \"{name}\"? This action cannot be undone.",
     "deletedSuccess": "Category deleted successfully",
-    "errorDeleting": "Error deleting category: {message}"
+    "errorDeleting": "Error deleting category: {message}",
+    "showingPage": "Showing page {page} of {totalPages} ({total} total)",
+    "previous": "Previous",
+    "next": "Next"
   },
   "delivery": {
     "title": "Delivery",

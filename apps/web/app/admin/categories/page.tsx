@@ -32,6 +32,8 @@ function CategoriesSection() {
     subcategoryIds: [] as string[],
   });
   const [saving, setSaving] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -92,6 +94,17 @@ function CategoriesSection() {
   };
 
   const categoryTree = buildCategoryTree(categories);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(categoryTree.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedCategories = categoryTree.slice(startIndex, endIndex);
+
+  // Reset to page 1 when categories change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [categories.length]);
 
   const handleAddCategory = async () => {
     if (!formData.title.trim()) {
@@ -233,8 +246,9 @@ function CategoriesSection() {
       {categoryTree.length === 0 ? (
         <p className="text-sm text-gray-500 py-2">{t('admin.categories.noCategories')}</p>
       ) : (
-        <div className="space-y-2 max-h-96 overflow-y-auto">
-          {categoryTree.map((category) => {
+        <>
+          <div className="space-y-2">
+            {paginatedCategories.map((category) => {
             const parentCategory = category.parentId 
               ? categories.find(c => c.id === category.parentId)
               : null;
@@ -290,7 +304,36 @@ function CategoriesSection() {
               </div>
             );
           })}
-        </div>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="mt-6 pt-4 border-t border-gray-200 flex items-center justify-between">
+              <div className="text-sm text-gray-700">
+                {t('admin.categories.showingPage')
+                  .replace('{page}', currentPage.toString())
+                  .replace('{totalPages}', totalPages.toString())
+                  .replace('{total}', categoryTree.length.toString())}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  {t('admin.categories.previous')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  {t('admin.categories.next')}
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Add Category Modal */}

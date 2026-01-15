@@ -188,7 +188,10 @@
     "errorUpdating": "Սխալ կատեգորիա թարմացնելիս",
     "deleteConfirm": "Վստահ ե՞ք, որ ցանկանում եք ջնջել կատեգորիա \"{name}\": Այս գործողությունը չի կարող հետարկվել:",
     "deletedSuccess": "Կատեգորիան հաջողությամբ ջնջվեց",
-    "errorDeleting": "Սխալ կատեգորիան ջնջելիս: {message}"
+    "errorDeleting": "Սխալ կատեգորիան ջնջելիս: {message}",
+    "showingPage": "Ցուցադրվում է {page} էջը {totalPages}-ից ({total} ընդամենը)",
+    "previous": "Նախորդ",
+    "next": "Հաջորդ"
   },
   "delivery": {
     "title": "Առաքում",
