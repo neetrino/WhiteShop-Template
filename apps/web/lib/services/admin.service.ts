@@ -1652,9 +1652,16 @@ class AdminService {
           for (const variant of createdVariants) {
             if (!variant.imageUrl) continue;
 
-            // Extract first image URL from comma-separated string
-            const variantImageUrl = variant.imageUrl.split(',')[0]?.trim();
-            if (!variantImageUrl) continue;
+            // Use smartSplitUrls to properly handle comma-separated URLs and base64 images
+            const variantImageUrls = smartSplitUrls(variant.imageUrl);
+            if (variantImageUrls.length === 0) continue;
+
+            // Process and validate first image URL
+            const firstVariantImageUrl = processImageUrl(variantImageUrls[0]);
+            if (!firstVariantImageUrl) {
+              console.log(`⚠️ [ADMIN SERVICE] Variant ${variant.id} has invalid imageUrl, skipping attribute value update`);
+              continue;
+            }
 
             // Get all attribute value IDs from this variant's options
             const attributeValueIds = new Set<string>();
@@ -1676,13 +1683,13 @@ class AdminService {
                 // 1. Attribute value doesn't have an imageUrl, OR
                 // 2. Variant image is a base64 (more specific) and attribute value has a URL
                 const shouldUpdate = !attrValue.imageUrl || 
-                  (variantImageUrl.startsWith('data:image/') && attrValue.imageUrl && !attrValue.imageUrl.startsWith('data:image/'));
+                  (firstVariantImageUrl.startsWith('data:image/') && attrValue.imageUrl && !attrValue.imageUrl.startsWith('data:image/'));
 
                 if (shouldUpdate) {
-                  console.log(`📸 [ADMIN SERVICE] Updating attribute value ${valueId} imageUrl from variant ${variant.id}:`, variantImageUrl.substring(0, 50) + '...');
+                  console.log(`📸 [ADMIN SERVICE] Updating attribute value ${valueId} imageUrl from variant ${variant.id}:`, firstVariantImageUrl.substring(0, 50) + '...');
                   await tx.attributeValue.update({
                     where: { id: valueId },
-                    data: { imageUrl: variantImageUrl },
+                    data: { imageUrl: firstVariantImageUrl },
                   });
                 } else {
                   console.log(`⏭️ [ADMIN SERVICE] Skipping attribute value ${valueId} - already has imageUrl`);
@@ -2184,9 +2191,16 @@ class AdminService {
           for (const variant of allVariants) {
             if (!variant.imageUrl) continue;
 
-            // Extract first image URL from comma-separated string
-            const variantImageUrl = variant.imageUrl.split(',')[0]?.trim();
-            if (!variantImageUrl) continue;
+            // Use smartSplitUrls to properly handle comma-separated URLs and base64 images
+            const variantImageUrls = smartSplitUrls(variant.imageUrl);
+            if (variantImageUrls.length === 0) continue;
+
+            // Process and validate first image URL
+            const firstVariantImageUrl = processImageUrl(variantImageUrls[0]);
+            if (!firstVariantImageUrl) {
+              console.log(`⚠️ [ADMIN SERVICE] Variant ${variant.id} has invalid imageUrl, skipping attribute value update`);
+              continue;
+            }
 
             // Get all attribute value IDs from this variant's options
             const attributeValueIds = new Set<string>();
@@ -2208,13 +2222,13 @@ class AdminService {
                 // 1. Attribute value doesn't have an imageUrl, OR
                 // 2. Variant image is a base64 (more specific) and attribute value has a URL
                 const shouldUpdate = !attrValue.imageUrl || 
-                  (variantImageUrl.startsWith('data:image/') && attrValue.imageUrl && !attrValue.imageUrl.startsWith('data:image/'));
+                  (firstVariantImageUrl.startsWith('data:image/') && attrValue.imageUrl && !attrValue.imageUrl.startsWith('data:image/'));
 
                 if (shouldUpdate) {
-                  console.log(`📸 [ADMIN SERVICE] Updating attribute value ${valueId} imageUrl from variant ${variant.id}:`, variantImageUrl.substring(0, 50) + '...');
+                  console.log(`📸 [ADMIN SERVICE] Updating attribute value ${valueId} imageUrl from variant ${variant.id}:`, firstVariantImageUrl.substring(0, 50) + '...');
                   await tx.attributeValue.update({
                     where: { id: valueId },
-                    data: { imageUrl: variantImageUrl },
+                    data: { imageUrl: firstVariantImageUrl },
                   });
                 } else {
                   console.log(`⏭️ [ADMIN SERVICE] Skipping attribute value ${valueId} - already has imageUrl`);
