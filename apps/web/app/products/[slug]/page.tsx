@@ -302,15 +302,26 @@ export default function ProductPage({ params }: ProductPageProps) {
     
     // 2. Add variant images, but EXCLUDE those that match attribute value images
     // Variant images that are the same as attribute value images should NOT appear in gallery
+    // IMPORTANT: Process variant images properly to handle comma-separated URLs and base64
     if (product.variants) {
       product.variants.forEach(v => {
         if (v.imageUrl) {
+          // Use smartSplitUrls to properly handle comma-separated URLs and base64
           const split = smartSplitUrls(v.imageUrl);
           split.forEach((url: string) => {
+            if (!url || url.trim() === '') return;
+            
+            // Process the URL first to normalize it
+            const processed = processImageUrl(url);
+            if (!processed) return;
+            
             // Only add variant image if it's NOT an attribute value image
             // This ensures attribute value images don't appear in the main gallery
-            if (!isAttributeValueImage(url)) {
-              allRawImages.push(url);
+            if (!isAttributeValueImage(processed)) {
+              allRawImages.push(processed);
+              console.log(`🖼️ [PRODUCT IMAGES] Added variant image: ${processed.substring(0, 50)}...`);
+            } else {
+              console.log(`🖼️ [PRODUCT IMAGES] Skipped variant image (attribute value): ${processed.substring(0, 50)}...`);
             }
           });
         }
@@ -319,14 +330,18 @@ export default function ProductPage({ params }: ProductPageProps) {
 
     console.log('🖼️ [PRODUCT IMAGES] allRawImages before processing:', allRawImages);
     
+    // Process all images (main + variant) and remove duplicates
     const processedImages = allRawImages
       .map(processImageUrl)
       .filter((url): url is string => url !== null);
     
-    console.log('🖼️ [PRODUCT IMAGES] processedImages:', processedImages);
+    // Remove duplicates while preserving order
+    const uniqueImages = Array.from(new Set(processedImages));
+    
+    console.log('🖼️ [PRODUCT IMAGES] processedImages:', uniqueImages);
     
     // Final filter: remove any attribute value images that might have been added
-    const filteredImages = processedImages.filter(url => {
+    const filteredImages = uniqueImages.filter(url => {
       if (isAttributeValueImage(url)) {
         return false;
       }
@@ -731,44 +746,76 @@ export default function ProductPage({ params }: ProductPageProps) {
 
     // Try to find the first variant image in the images array
     for (const url of splitUrls) {
+      if (!url || url.trim() === '') continue;
+      
       const processedUrl = processImageUrl(url);
       if (!processedUrl) {
+        console.log(`⚠️ [VARIANT IMAGE] Failed to process URL: ${url.substring(0, 50)}...`);
         continue;
       }
 
       // If this variant image is an attribute value image, skip it
       // (attribute value images are not in the gallery, so we can't switch to them)
       if (isAttributeValueImage(processedUrl)) {
+        console.log(`⏭️ [VARIANT IMAGE] Skipping attribute value image: ${processedUrl.substring(0, 50)}...`);
         continue;
       }
 
-      // Try multiple matching strategies
+      // Try multiple matching strategies with better normalization
       const imageIndex = images.findIndex(img => {
-        const normalizedImg = normalizeUrl(img);
+        if (!img) return false;
+        
+        // Process both URLs for consistent comparison
+        const processedImg = processImageUrl(img);
+        if (!processedImg) return false;
+        
+        const normalizedImg = normalizeUrl(processedImg);
         const normalizedProcessed = normalizeUrl(processedUrl);
         
-        // Exact match
-        if (normalizedImg === normalizedProcessed) return true;
-        
-        // Match with/without leading slash
-        if (normalizedImg === normalizedProcessed || 
-            `/${normalizedImg}` === `/${normalizedProcessed}` ||
-            normalizedImg === normalizedProcessed.substring(1) ||
-            normalizedImg.substring(1) === normalizedProcessed) {
+        // Exact match after normalization
+        if (normalizedImg === normalizedProcessed) {
+          console.log(`✅ [VARIANT IMAGE] Found exact match: ${processedUrl.substring(0, 50)}...`);
           return true;
         }
         
-        // Match by filename (for cases where paths differ)
-        const imgFilename = img.split('/').pop()?.toLowerCase();
-        const processedFilename = processedUrl.split('/').pop()?.toLowerCase();
-        if (imgFilename && processedFilename && imgFilename === processedFilename) {
+        // Match with/without leading slash (handle both processed URLs)
+        const imgWithSlash = processedImg.startsWith('/') ? processedImg : `/${processedImg}`;
+        const imgWithoutSlash = processedImg.startsWith('/') ? processedImg.substring(1) : processedImg;
+        const processedWithSlash = processedUrl.startsWith('/') ? processedUrl : `/${processedUrl}`;
+        const processedWithoutSlash = processedUrl.startsWith('/') ? processedUrl.substring(1) : processedUrl;
+        
+        if (imgWithSlash === processedWithSlash || 
+            imgWithoutSlash === processedWithoutSlash ||
+            imgWithSlash === processedWithoutSlash ||
+            imgWithoutSlash === processedWithSlash) {
+          console.log(`✅ [VARIANT IMAGE] Found match with slash normalization: ${processedUrl.substring(0, 50)}...`);
           return true;
+        }
+        
+        // Match by filename (for cases where paths differ but filename is same)
+        // Only for non-base64 URLs
+        if (!processedImg.startsWith('data:') && !processedUrl.startsWith('data:')) {
+          const imgFilename = processedImg.split('/').pop()?.toLowerCase().split('?')[0];
+          const processedFilename = processedUrl.split('/').pop()?.toLowerCase().split('?')[0];
+          if (imgFilename && processedFilename && imgFilename === processedFilename) {
+            console.log(`✅ [VARIANT IMAGE] Found match by filename: ${imgFilename}`);
+            return true;
+          }
+        }
+        
+        // For base64 images, compare directly
+        if (processedImg.startsWith('data:') && processedUrl.startsWith('data:')) {
+          if (processedImg === processedUrl) {
+            console.log(`✅ [VARIANT IMAGE] Found base64 match`);
+            return true;
+          }
         }
         
         return false;
       });
 
       if (imageIndex !== -1) {
+        console.log(`🖼️ [VARIANT IMAGE] Switching to image index ${imageIndex}: ${processedUrl.substring(0, 50)}...`);
         setCurrentImageIndex(imageIndex);
         
         // Update thumbnail scroll if needed
@@ -777,8 +824,14 @@ export default function ProductPage({ params }: ProductPageProps) {
           setThumbnailStartIndex(newStart);
         }
         return;
+      } else {
+        console.log(`❌ [VARIANT IMAGE] Image not found in gallery: ${processedUrl.substring(0, 50)}...`);
+        console.log(`   Available images: ${images.length} total`);
+        console.log(`   First few images:`, images.slice(0, 3).map(img => img?.substring(0, 50)));
       }
     }
+    
+    console.log(`⚠️ [VARIANT IMAGE] No variant image found in gallery for variant ${variant.id}`);
   }, [images, processImageUrl, smartSplitUrls, thumbnailStartIndex, thumbnailsPerView, product]);
 
   useEffect(() => {

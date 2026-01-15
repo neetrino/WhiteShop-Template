@@ -788,32 +788,35 @@ function AddProductPageContent() {
           };
 
           const mediaList = product.media || [];
-          console.log('🖼️ [ADMIN] Filtering main media images. Total media:', mediaList.length);
-          // Filter out images that are already assigned to variants
+          console.log('🖼️ [ADMIN] Loading main media images. Total media:', mediaList.length);
+          // IMPORTANT: In edit mode, show ALL main media images, even if they also exist in variants
+          // This allows users to see and manage all main images they originally added
+          // Variant images will be shown separately in their respective variants
           const normalizedMedia = Array.isArray(mediaList)
             ? mediaList
-                .map((item: any) => (typeof item === 'string' ? item : item?.url || ''))
-                .filter((url: string) => {
-                  if (!url) return false;
-                  // Check all normalized versions
-                  const normalizedVersions = normalizeUrlForComparison(url);
-                  const isVariantImage = normalizedVersions.some(normalized => variantImages.has(normalized));
-                  if (isVariantImage) {
-                    console.log(`  ❌ Filtered out variant image from main (length: ${url.length})`);
-                  } else {
-                    console.log(`  ✅ Keeping main image (length: ${url.length})`);
+                .map((item: any) => {
+                  if (typeof item === 'string') {
+                    return item;
+                  } else if (item && typeof item === 'object') {
+                    return item?.url || item?.src || item?.value || '';
                   }
-                  return !isVariantImage;
+                  return '';
+                })
+                .filter((url: string) => {
+                  if (!url || url.trim() === '') return false;
+                  console.log(`  ✅ Keeping main image (length: ${url.length})`);
+                  return true;
                 })
             : [];
-          console.log(`🖼️ [ADMIN] Main media after filtering: ${normalizedMedia.length} images`);
+          console.log(`🖼️ [ADMIN] Main media loaded: ${normalizedMedia.length} images`);
           
+          // Find featured image index from original mediaList (before filtering)
           const featuredIndexFromApi = Array.isArray(mediaList)
             ? mediaList.findIndex((item: any) => {
                 const url = typeof item === 'string' ? item : item?.url || '';
                 if (!url) return false;
-                const normalizedUrl = url.startsWith('/') ? url : `/${url}`;
-                return typeof item === 'object' && item?.isFeatured && !variantImages.has(url) && !variantImages.has(normalizedUrl);
+                // Check if this item is marked as featured
+                return typeof item === 'object' && item?.isFeatured === true;
               })
             : -1;
 
