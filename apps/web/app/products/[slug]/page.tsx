@@ -130,7 +130,7 @@ export default function ProductPage({ params }: ProductPageProps) {
   const [isInCompare, setIsInCompare] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [reviews, setReviews] = useState<Array<{ rating: number }>>([]);
-  const thumbnailsPerView = 3;
+  const thumbnailsPerView = 3; // Show 3 thumbnails at a time
 
   // Use unified image utilities (imported from image-utils.ts)
 
@@ -140,6 +140,11 @@ export default function ProductPage({ params }: ProductPageProps) {
     if (!product) return [];
     
     console.log('🖼️ [PRODUCT IMAGES] Building images array for product:', product.id);
+    
+    // Collect all main images (product.media is already cleaned in findBySlug)
+    const mainImages = Array.isArray(product.media) ? product.media : [];
+    const cleanedMain = cleanImageUrls(mainImages);
+    console.log('🖼️ [PRODUCT IMAGES] Main images from product.media:', cleanedMain.length);
     
     // Collect all variant images
     const variantImages: any[] = [];
@@ -159,19 +164,38 @@ export default function ProductPage({ params }: ProductPageProps) {
       });
     }
     
-    // Use unified utility to separate and clean images
-    // product.media is already cleaned in findBySlug, but we do final separation here
-    const { main, variants: variantOnly } = separateMainAndVariantImages(
-      Array.isArray(product.media) ? product.media : [],
-      variantImages
-    );
+    const cleanedVariantImages = cleanImageUrls(variantImages);
+    console.log('🖼️ [PRODUCT IMAGES] Variant images:', cleanedVariantImages.length);
     
-    // Combine main images first, then variant-only images
-    const allImages = [...cleanImageUrls(main), ...cleanImageUrls(variantOnly)];
+    // Combine all images: main first, then variant images
+    // Use array to preserve order, Set to track duplicates
+    const allImages: string[] = [];
+    const seenNormalized = new Set<string>();
+    
+    // Add main images first (preserve order)
+    cleanedMain.forEach((img) => {
+      const processed = processImageUrl(img) || img;
+      const normalized = normalizeUrlForComparison(processed);
+      if (!seenNormalized.has(normalized)) {
+        allImages.push(img);
+        seenNormalized.add(normalized);
+      }
+    });
+    
+    // Add variant images that are not already in main images
+    cleanedVariantImages.forEach((img) => {
+      const processed = processImageUrl(img) || img;
+      const normalized = normalizeUrlForComparison(processed);
+      if (!seenNormalized.has(normalized)) {
+        allImages.push(img);
+        seenNormalized.add(normalized);
+      }
+    });
     
     console.log('🖼️ [PRODUCT IMAGES] Final images count:', allImages.length);
-    console.log('🖼️ [PRODUCT IMAGES] Main images:', cleanImageUrls(main).length);
-    console.log('🖼️ [PRODUCT IMAGES] Variant-only images:', cleanImageUrls(variantOnly).length);
+    console.log('🖼️ [PRODUCT IMAGES] Main images:', cleanedMain.length);
+    console.log('🖼️ [PRODUCT IMAGES] Variant images:', cleanedVariantImages.length);
+    console.log('🖼️ [PRODUCT IMAGES] Unique images after deduplication:', allImages.length);
     
     return allImages;
   }, [product]);
@@ -637,11 +661,7 @@ export default function ProductPage({ params }: ProductPageProps) {
         console.log(`🖼️ [VARIANT IMAGE] Switching to image index ${imageIndex}: ${processedUrl.substring(0, 50)}...`);
         setCurrentImageIndex(imageIndex);
         
-        // Update thumbnail scroll if needed
-        if (imageIndex < thumbnailStartIndex || imageIndex >= thumbnailStartIndex + thumbnailsPerView) {
-          const newStart = Math.max(0, Math.min(images.length - thumbnailsPerView, imageIndex));
-          setThumbnailStartIndex(newStart);
-        }
+        // No need to update thumbnail scroll - all images are visible
         return;
       } else {
         console.log(`❌ [VARIANT IMAGE] Image not found in gallery: ${processedUrl.substring(0, 50)}...`);
@@ -651,7 +671,7 @@ export default function ProductPage({ params }: ProductPageProps) {
     }
     
     console.log(`⚠️ [VARIANT IMAGE] No variant image found in gallery for variant ${variant.id}`);
-  }, [images, processImageUrl, smartSplitUrls, thumbnailStartIndex, thumbnailsPerView, product]);
+  }, [images, processImageUrl, smartSplitUrls, product]);
 
   useEffect(() => {
     if (product && product.variants && product.variants.length > 0) {
@@ -1224,10 +1244,16 @@ export default function ProductPage({ params }: ProductPageProps) {
     });
   };
 
+  // Auto-scroll thumbnails to show selected image
   useEffect(() => {
     if (images.length > thumbnailsPerView) {
-      if (currentImageIndex < thumbnailStartIndex) setThumbnailStartIndex(currentImageIndex);
-      else if (currentImageIndex >= thumbnailStartIndex + thumbnailsPerView) setThumbnailStartIndex(currentImageIndex - thumbnailsPerView + 1);
+      if (currentImageIndex < thumbnailStartIndex) {
+        // Selected image is above visible range - scroll up
+        setThumbnailStartIndex(currentImageIndex);
+      } else if (currentImageIndex >= thumbnailStartIndex + thumbnailsPerView) {
+        // Selected image is below visible range - scroll down
+        setThumbnailStartIndex(currentImageIndex - thumbnailsPerView + 1);
+      }
     }
   }, [currentImageIndex, images.length, thumbnailStartIndex]);
 
@@ -1292,23 +1318,24 @@ export default function ProductPage({ params }: ProductPageProps) {
 
   if (loading || !product) return <div className="max-w-7xl mx-auto px-4 py-16 text-center">{t(language, 'common.messages.loading')}</div>;
 
+  // Show only 3 thumbnails at a time, scrollable with navigation arrows
   const visibleThumbnails = images.slice(thumbnailStartIndex, thumbnailStartIndex + thumbnailsPerView);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="grid grid-cols-1 lg:grid-cols-[55%_45%] gap-12 items-start">
         <div className="flex gap-6 items-start">
-          {/* Left Column - Thumbnails (Vertical) */}
+          {/* Left Column - Thumbnails (Vertical) - Show 3 at a time, scrollable */}
           <div className="flex flex-col gap-4 w-28 flex-shrink-0">
-            <div className="flex flex-col gap-4 flex-1">
+            <div className="flex flex-col gap-4 flex-1 overflow-hidden">
               {visibleThumbnails.map((image, index) => {
                 const actualIndex = thumbnailStartIndex + index;
                 const isActive = actualIndex === currentImageIndex;
                 return (
                   <button 
-                    key={actualIndex} 
+                    key={actualIndex}
                     onClick={() => setCurrentImageIndex(actualIndex)}
-                    className={`relative w-full aspect-[3/4] rounded-lg overflow-hidden border bg-white transition-all duration-300 ${
+                    className={`relative w-full aspect-[3/4] rounded-lg overflow-hidden border bg-white transition-all duration-300 flex-shrink-0 ${
                       isActive 
                         ? 'border-gray-400 shadow-[0_2px_8px_rgba(0,0,0,0.12)] ring-2 ring-gray-300' 
                         : 'border-gray-200 hover:border-gray-300 hover:shadow-[0_2px_6px_rgba(0,0,0,0.08)]'
@@ -1324,7 +1351,7 @@ export default function ProductPage({ params }: ProductPageProps) {
               })}
             </div>
             
-            {/* Navigation Arrows - Both at the bottom, side by side */}
+            {/* Navigation Arrows - Scroll thumbnails */}
             {images.length > thumbnailsPerView && (
               <div className="flex flex-row gap-1.5 justify-center">
                 <button 
@@ -1332,14 +1359,17 @@ export default function ProductPage({ params }: ProductPageProps) {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    const newIndex = Math.max(0, currentImageIndex - 1);
-                    setCurrentImageIndex(newIndex);
-                    // Update thumbnail scroll to show the new image
-                    if (newIndex < thumbnailStartIndex) {
-                      setThumbnailStartIndex(newIndex);
+                    // Scroll thumbnails up
+                    const newStart = Math.max(0, thumbnailStartIndex - 1);
+                    setThumbnailStartIndex(newStart);
+                    // Also update current image if needed
+                    if (currentImageIndex > newStart + thumbnailsPerView - 1) {
+                      setCurrentImageIndex(newStart + thumbnailsPerView - 1);
+                    } else if (currentImageIndex < newStart) {
+                      setCurrentImageIndex(newStart);
                     }
                   }}
-                  disabled={currentImageIndex <= 0}
+                  disabled={thumbnailStartIndex <= 0}
                   className="w-9 h-9 rounded border transition-all duration-200 flex items-center justify-center border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-200 hover:shadow-[0_1px_3px_rgba(0,0,0,0.1)] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-gray-100 disabled:hover:border-gray-300 disabled:hover:shadow-none bg-gray-100"
                   aria-label={t(language, 'common.ariaLabels.previousThumbnail')}
                 >
@@ -1362,14 +1392,17 @@ export default function ProductPage({ params }: ProductPageProps) {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    const newIndex = Math.min(images.length - 1, currentImageIndex + 1);
-                    setCurrentImageIndex(newIndex);
-                    // Update thumbnail scroll to show the new image
-                    if (newIndex >= thumbnailStartIndex + thumbnailsPerView) {
-                      setThumbnailStartIndex(newIndex - thumbnailsPerView + 1);
+                    // Scroll thumbnails down
+                    const newStart = Math.min(images.length - thumbnailsPerView, thumbnailStartIndex + 1);
+                    setThumbnailStartIndex(newStart);
+                    // Also update current image if needed
+                    if (currentImageIndex < newStart) {
+                      setCurrentImageIndex(newStart);
+                    } else if (currentImageIndex > newStart + thumbnailsPerView - 1) {
+                      setCurrentImageIndex(newStart + thumbnailsPerView - 1);
                     }
                   }}
-                  disabled={currentImageIndex >= images.length - 1}
+                  disabled={thumbnailStartIndex >= images.length - thumbnailsPerView}
                   className="w-9 h-9 rounded border transition-all duration-200 flex items-center justify-center border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-200 hover:shadow-[0_1px_3px_rgba(0,0,0,0.1)] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-gray-100 disabled:hover:border-gray-300 disabled:hover:shadow-none bg-gray-100"
                   aria-label={t(language, 'common.ariaLabels.nextThumbnail')}
                 >

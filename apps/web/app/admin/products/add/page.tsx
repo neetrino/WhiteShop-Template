@@ -1791,21 +1791,75 @@ function AddProductPageContent() {
       return;
     }
 
+    console.log('📸 [UPLOAD] Starting upload of', files.length, 'image(s)');
     setImageUploadLoading(true);
     setImageUploadError(null);
     try {
-      const uploadedImages = await Promise.all(
-        files.map(async (file) => {
+      // Process all files in parallel using Promise.allSettled to handle errors gracefully
+      // This ensures all files are processed and prevents off-by-one errors
+      const uploadedImages: string[] = [];
+      const errors: string[] = [];
+      
+      // Create promises for all files to process them in parallel
+      const filePromises = files.map(async (file, index) => {
+        try {
           if (!file.type.startsWith('image/')) {
-            throw new Error(`"${file.name}" is not an image file`);
+            const errorMsg = `"${file.name}" is not an image file`;
+            console.warn(`⚠️ [UPLOAD] Skipping non-image file ${index + 1}/${files.length}:`, file.name);
+            return { success: false, error: errorMsg, index };
           }
+          
+          console.log(`📸 [UPLOAD] Processing file ${index + 1}/${files.length}:`, file.name, `(${Math.round(file.size / 1024)}KB)`);
           const base64 = await fileToBase64(file);
-          return base64;
-        })
-      );
+          
+          if (base64 && base64.trim()) {
+            console.log(`✅ [UPLOAD] Successfully processed file ${index + 1}/${files.length}:`, file.name);
+            return { success: true, base64, index };
+          } else {
+            const errorMsg = `Failed to convert "${file.name}" to base64`;
+            console.error(`❌ [UPLOAD] Empty base64 result for file ${index + 1}/${files.length}:`, file.name);
+            return { success: false, error: errorMsg, index };
+          }
+        } catch (error: any) {
+          const errorMsg = `Error processing "${file.name}": ${error?.message || 'Unknown error'}`;
+          console.error(`❌ [UPLOAD] Error processing file ${index + 1}/${files.length}:`, file.name, error);
+          return { success: false, error: errorMsg, index };
+        }
+      });
+
+      // Wait for all files to be processed (both successful and failed)
+      const results = await Promise.allSettled(filePromises);
+      
+      // Process results in order to maintain file order
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          const fileResult = result.value;
+          if (fileResult.success && fileResult.base64) {
+            uploadedImages.push(fileResult.base64);
+          } else if (!fileResult.success && fileResult.error) {
+            errors.push(fileResult.error);
+          }
+        } else {
+          const errorMsg = `Failed to process file ${index + 1}: ${result.reason?.message || 'Unknown error'}`;
+          errors.push(errorMsg);
+          console.error(`❌ [UPLOAD] Promise rejected for file ${index + 1}:`, result.reason);
+        }
+      });
+
+      console.log('📸 [UPLOAD] Upload complete. Processed:', uploadedImages.length, 'of', files.length, 'files');
+      if (errors.length > 0) {
+        console.warn('⚠️ [UPLOAD] Errors during upload:', errors);
+        setImageUploadError(errors.join('; '));
+      }
+
+      if (uploadedImages.length === 0) {
+        setImageUploadError(t('admin.products.add.failedToProcessImages') || 'Failed to process images');
+        return;
+      }
 
       setFormData((prev) => {
         const newImageUrls = [...prev.imageUrls, ...uploadedImages];
+        console.log('📸 [UPLOAD] Total images after upload:', newImageUrls.length, '(was', prev.imageUrls.length, ', added', uploadedImages.length, ')');
         // If this is the first image, set it as main automatically
         const newFeaturedIndex = prev.imageUrls.length === 0 ? 0 : prev.featuredImageIndex;
         return {
@@ -1817,6 +1871,7 @@ function AddProductPageContent() {
         };
       });
     } catch (error: any) {
+      console.error('❌ [UPLOAD] Fatal error during upload:', error);
       setImageUploadError(error?.message || t('admin.products.add.failedToProcessImages'));
     } finally {
       setImageUploadLoading(false);
