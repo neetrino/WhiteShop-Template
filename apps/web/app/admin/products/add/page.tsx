@@ -884,6 +884,66 @@ function AddProductPageContent() {
             console.log('📋 [ADMIN] Product attributeIds loaded:', product.attributeIds);
           }
           
+          // Check if product has variants with attributes
+          // IMPORTANT: A product is "simple" if variants don't have attributes (color, size, etc.)
+          // Even if product has attributeIds, if variants don't use them, it's still simple
+          const variants = product.variants || [];
+          const hasVariants = variants.length > 0;
+          const hasVariantsWithAttributes = hasVariants && 
+            variants.some((variant: any) => {
+              // Check if variant has attributes in JSONB column
+              if (variant.attributes && typeof variant.attributes === 'object' && Object.keys(variant.attributes).length > 0) {
+                return true;
+              }
+              // Check if variant has options (old format)
+              if (variant.options && Array.isArray(variant.options) && variant.options.length > 0) {
+                return true;
+              }
+              return false;
+            });
+          
+          // Log for debugging
+          console.log('📦 [ADMIN] Product type check:', {
+            hasVariants,
+            variantsCount: variants.length,
+            hasVariantsWithAttributes,
+            firstVariant: hasVariants && variants.length > 0 ? {
+              hasAttributes: !!(variants[0] && (variants[0] as any).attributes && typeof (variants[0] as any).attributes === 'object' && Object.keys((variants[0] as any).attributes).length > 0),
+              hasOptions: !!((variants[0] as any).options && Array.isArray((variants[0] as any).options) && (variants[0] as any).options.length > 0),
+              attributes: (variants[0] as any).attributes,
+              optionsCount: ((variants[0] as any).options?.length || 0),
+            } : null,
+          });
+          
+          // If variants don't have attributes, set to simple (even if product has attributeIds)
+          if (!hasVariantsWithAttributes) {
+            console.log('📦 [ADMIN] Product variants have no attributes, setting productType to "simple"');
+            setProductType('simple');
+            
+            // Also set simple product data from first variant if available
+            if (hasVariants && variants.length > 0) {
+              const firstVariant = variants[0] as any;
+              setSimpleProductData({
+                price: firstVariant.price ? String(convertPrice(typeof firstVariant.price === 'number' ? firstVariant.price : parseFloat(String(firstVariant.price || '0')), 'USD', defaultCurrency)) : '',
+                compareAtPrice: firstVariant.compareAtPrice ? String(convertPrice(typeof firstVariant.compareAtPrice === 'number' ? firstVariant.compareAtPrice : parseFloat(String(firstVariant.compareAtPrice || '0')), 'USD', defaultCurrency)) : '',
+                sku: firstVariant.sku || '',
+                quantity: String(firstVariant.stock || 0),
+              });
+            } else {
+              // No variants at all, set empty simple product data
+              setSimpleProductData({
+                price: '',
+                compareAtPrice: '',
+                sku: '',
+                quantity: '0',
+              });
+            }
+          } else {
+            // Variants have attributes, keep it as variable
+            console.log('📦 [ADMIN] Product variants have attributes, keeping productType as "variable"');
+            setProductType('variable');
+          }
+          
           console.log('✅ [ADMIN] Product loaded for edit');
         } catch (err: any) {
           console.error('❌ [ADMIN] Error loading product:', err);
@@ -3612,86 +3672,6 @@ function AddProductPageContent() {
               </div>
             </div>
 
-            {/* Simple Product Fields - Only shown when productType === 'simple' */}
-            {productType === 'simple' && (
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('admin.products.add.productVariants')}</h2>
-                <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Price */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        {t('admin.products.add.price')} *
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          value={simpleProductData.price}
-                          onChange={(e) => setSimpleProductData((prev) => ({ ...prev, price: e.target.value }))}
-                          placeholder={t('admin.products.add.pricePlaceholder')}
-                          className="flex-1"
-                          min="0"
-                          step="0.01"
-                          required
-                        />
-                        <span className="text-sm text-gray-500 whitespace-nowrap">{CURRENCIES[defaultCurrency].symbol}</span>
-                      </div>
-                    </div>
-
-                    {/* Compare At Price */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        {t('admin.products.add.compareAtPrice')}
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          value={simpleProductData.compareAtPrice}
-                          onChange={(e) => setSimpleProductData((prev) => ({ ...prev, compareAtPrice: e.target.value }))}
-                          placeholder={t('admin.products.add.pricePlaceholder')}
-                          className="flex-1"
-                          min="0"
-                          step="0.01"
-                        />
-                        <span className="text-sm text-gray-500 whitespace-nowrap">{CURRENCIES[defaultCurrency].symbol}</span>
-                      </div>
-                    </div>
-
-                    {/* SKU */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        {t('admin.products.add.sku')} *
-                      </label>
-                      <Input
-                        type="text"
-                        value={simpleProductData.sku}
-                        onChange={(e) => setSimpleProductData((prev) => ({ ...prev, sku: e.target.value }))}
-                        placeholder={t('admin.products.add.autoGenerated')}
-                        className="w-full"
-                        required
-                      />
-                    </div>
-
-                    {/* Quantity */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        {t('admin.products.add.quantity')} *
-                      </label>
-                      <Input
-                        type="number"
-                        value={simpleProductData.quantity}
-                        onChange={(e) => setSimpleProductData((prev) => ({ ...prev, quantity: e.target.value }))}
-                        placeholder={t('admin.products.add.quantityPlaceholder')}
-                        className="w-full"
-                        min="0"
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Categories & Brands */}
             <div>
               <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('admin.products.add.categoriesAndBrands')}</h2>
@@ -4107,6 +4087,87 @@ function AddProductPageContent() {
                 </div>
               )}
             </div>
+
+            {/* Simple Product Fields - Only shown when productType === 'simple' */}
+            {/* Moved here to appear after Product Labels */}
+            {productType === 'simple' && (
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('admin.products.add.productVariants')}</h2>
+                <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Price */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        {t('admin.products.add.price')} *
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          value={simpleProductData.price}
+                          onChange={(e) => setSimpleProductData((prev) => ({ ...prev, price: e.target.value }))}
+                          placeholder={t('admin.products.add.pricePlaceholder')}
+                          className="flex-1"
+                          min="0"
+                          step="0.01"
+                          required
+                        />
+                        <span className="text-sm text-gray-500 whitespace-nowrap">{CURRENCIES[defaultCurrency].symbol}</span>
+                      </div>
+                    </div>
+
+                    {/* Compare At Price */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        {t('admin.products.add.compareAtPrice')}
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          value={simpleProductData.compareAtPrice}
+                          onChange={(e) => setSimpleProductData((prev) => ({ ...prev, compareAtPrice: e.target.value }))}
+                          placeholder={t('admin.products.add.pricePlaceholder')}
+                          className="flex-1"
+                          min="0"
+                          step="0.01"
+                        />
+                        <span className="text-sm text-gray-500 whitespace-nowrap">{CURRENCIES[defaultCurrency].symbol}</span>
+                      </div>
+                    </div>
+
+                    {/* SKU */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        {t('admin.products.add.sku')} *
+                      </label>
+                      <Input
+                        type="text"
+                        value={simpleProductData.sku}
+                        onChange={(e) => setSimpleProductData((prev) => ({ ...prev, sku: e.target.value }))}
+                        placeholder={t('admin.products.add.autoGenerated')}
+                        className="w-full"
+                        required
+                      />
+                    </div>
+
+                    {/* Quantity */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        {t('admin.products.add.quantity')} *
+                      </label>
+                      <Input
+                        type="number"
+                        value={simpleProductData.quantity}
+                        onChange={(e) => setSimpleProductData((prev) => ({ ...prev, quantity: e.target.value }))}
+                        placeholder={t('admin.products.add.quantityPlaceholder')}
+                        className="w-full"
+                        min="0"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Select Attributes for Variants - Only shown when productType === 'variable' */}
             {productType === 'variable' && (
