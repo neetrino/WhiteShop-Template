@@ -1701,8 +1701,11 @@ class AdminService {
           }
         }
 
-        // Update attribute value imageUrls from variant images
-        // If a variant has an imageUrl, update the corresponding attribute value's imageUrl
+        // DISABLED: Update attribute value imageUrls from variant images
+        // When creating a new product, attribute values should remain unchanged
+        // Attribute value images and colors should not be automatically updated from variant images
+        // This ensures that attribute values keep their original state when products are created
+        /*
         try {
           console.log('🖼️ [ADMIN SERVICE] Updating attribute value imageUrls from variant images...');
           const createdVariants = await tx.productVariant.findMany({
@@ -1740,12 +1743,37 @@ class AdminService {
 
             // Update each attribute value's imageUrl if it doesn't already have one
             // or if the variant image is more specific (e.g., base64 or full URL)
+            // BUT skip updating if:
+            // - Attribute is "color" and attribute value doesn't have an imageUrl
+            // - Attribute value only has colors but no imageUrl
             for (const valueId of attributeValueIds) {
               const attrValue = await tx.attributeValue.findUnique({
                 where: { id: valueId },
+                include: {
+                  attribute: true,
+                },
               });
 
               if (attrValue) {
+                // Check if attribute is "color"
+                const isColorAttribute = attrValue.attribute?.key === "color";
+                
+                // Check if attribute value only has colors but no imageUrl
+                const hasColors = attrValue.colors && 
+                  (Array.isArray(attrValue.colors) ? attrValue.colors.length > 0 : 
+                   typeof attrValue.colors === 'string' ? attrValue.colors.trim() !== '' && attrValue.colors !== '[]' : 
+                   Object.keys(attrValue.colors || {}).length > 0);
+                const hasNoImageUrl = !attrValue.imageUrl || attrValue.imageUrl.trim() === '';
+                const isColorOnly = hasColors && hasNoImageUrl;
+
+                // Skip updating if:
+                // 1. It's a color attribute AND doesn't have an imageUrl, OR
+                // 2. It only has colors but no imageUrl
+                if ((isColorAttribute && hasNoImageUrl) || isColorOnly) {
+                  console.log(`⏭️ [ADMIN SERVICE] Skipping attribute value ${valueId} - color attribute or color-only value without imageUrl`);
+                  continue;
+                }
+
                 // Only update if:
                 // 1. Attribute value doesn't have an imageUrl, OR
                 // 2. Variant image is a base64 (more specific) and attribute value has a URL
@@ -1769,6 +1797,7 @@ class AdminService {
           // Don't fail the transaction if this fails - it's a nice-to-have feature
           console.warn('⚠️ [ADMIN SERVICE] Failed to update attribute value imageUrls from variant images:', error);
         }
+        */
 
         return await tx.product.findUnique({
           where: { id: product.id },
@@ -2279,12 +2308,37 @@ class AdminService {
 
             // Update each attribute value's imageUrl if it doesn't already have one
             // or if the variant image is more specific (e.g., base64 or full URL)
+            // BUT skip updating if:
+            // - Attribute is "color" and attribute value doesn't have an imageUrl
+            // - Attribute value only has colors but no imageUrl
             for (const valueId of attributeValueIds) {
               const attrValue = await tx.attributeValue.findUnique({
                 where: { id: valueId },
+                include: {
+                  attribute: true,
+                },
               });
 
               if (attrValue) {
+                // Check if attribute is "color"
+                const isColorAttribute = attrValue.attribute?.key === "color";
+                
+                // Check if attribute value only has colors but no imageUrl
+                const hasColors = attrValue.colors && 
+                  (Array.isArray(attrValue.colors) ? attrValue.colors.length > 0 : 
+                   typeof attrValue.colors === 'string' ? attrValue.colors.trim() !== '' && attrValue.colors !== '[]' : 
+                   Object.keys(attrValue.colors || {}).length > 0);
+                const hasNoImageUrl = !attrValue.imageUrl || attrValue.imageUrl.trim() === '';
+                const isColorOnly = hasColors && hasNoImageUrl;
+
+                // Skip updating if:
+                // 1. It's a color attribute AND doesn't have an imageUrl, OR
+                // 2. It only has colors but no imageUrl
+                if ((isColorAttribute && hasNoImageUrl) || isColorOnly) {
+                  console.log(`⏭️ [ADMIN SERVICE] Skipping attribute value ${valueId} - color attribute or color-only value without imageUrl`);
+                  continue;
+                }
+
                 // Only update if:
                 // 1. Attribute value doesn't have an imageUrl, OR
                 // 2. Variant image is a base64 (more specific) and attribute value has a URL
