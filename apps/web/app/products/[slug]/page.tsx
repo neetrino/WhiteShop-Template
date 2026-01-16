@@ -271,9 +271,9 @@ export default function ProductPage({ params }: ProductPageProps) {
         }
         setSelectedVariant(initialVariant);
         const colorOption = initialVariant.options?.find(opt => opt.key === 'color');
-        if (colorOption) setSelectedColor(colorOption.value);
+        if (colorOption) setSelectedColor(colorOption.value?.toLowerCase().trim() || null);
         const sizeOption = initialVariant.options?.find(opt => opt.key === 'size');
-        if (sizeOption) setSelectedSize(sizeOption.value);
+        if (sizeOption) setSelectedSize(sizeOption.value?.toLowerCase().trim() || null);
       }
     } catch (error: any) {
       // If product not found (404), clear product state and show error
@@ -1258,10 +1258,12 @@ export default function ProductPage({ params }: ProductPageProps) {
   }, [currentImageIndex, images.length, thumbnailStartIndex]);
 
   const handleColorSelect = (color: string) => {
-    if (selectedColor === color) {
+    if (!color) return;
+    const normalizedColor = color.toLowerCase().trim();
+    if (selectedColor === normalizedColor) {
       setSelectedColor(null);
     } else {
-      setSelectedColor(color);
+      setSelectedColor(normalizedColor);
       // Image switching will be handled by the useEffect that watches selectedColor
     }
   };
@@ -1543,7 +1545,7 @@ export default function ProductPage({ params }: ProductPageProps) {
                     {isColor ? (
                       <div className="flex flex-wrap gap-1.5 items-center">
                         {attrGroups.map((g) => {
-                          const isSelected = selectedColor === g.value.toLowerCase().trim();
+                          const isSelected = selectedColor === g.value?.toLowerCase().trim();
                           // IMPORTANT: Don't disable based on stock - show all colors, even if stock is 0
                           // Stock is just informational, not a reason to hide the option
                           const isDisabled = false; // Always show all colors
@@ -1565,12 +1567,12 @@ export default function ProductPage({ params }: ProductPageProps) {
                             <div key={g.valueId || g.value} className="flex flex-col items-center gap-0.5">
                               <button 
                                 onClick={() => handleColorSelect(g.value)}
-                                className={`${sizeClass} rounded-full border-2 transition-all overflow-hidden ${
+                                className={`${sizeClass} rounded-full transition-all overflow-hidden ${
                                   isSelected 
-                                    ? 'border-gray-900 ring-2 ring-offset-1 ring-gray-900 scale-110' 
+                                    ? 'border-[3px] border-green-500 scale-110' 
                                     : g.stock <= 0
-                                      ? 'border-gray-200 opacity-60 hover:opacity-80' 
-                                      : 'border-gray-300 hover:scale-105'
+                                      ? 'border-2 border-gray-200 opacity-60 hover:opacity-80' 
+                                      : 'border-2 border-gray-300 hover:scale-105'
                                 }`}
                                 style={hasImage ? {} : { backgroundColor: colorHex }}
                                 title={`${getAttributeLabel(language, attrKey, g.value)}${g.stock > 0 ? ` (${g.stock} ${t(language, 'product.pcs')})` : ` (${t(language, 'product.outOfStock')})`}`} 
@@ -1628,7 +1630,7 @@ export default function ProductPage({ params }: ProductPageProps) {
                               onClick={() => handleSizeSelect(g.value)}
                               className={`${minWidthClass} ${paddingClass} rounded-lg border-2 transition-all flex items-center gap-1.5 ${
                                 isSelected 
-                                  ? 'border-gray-900 bg-gray-50' 
+                                  ? 'border-green-500 bg-gray-50' 
                                   : displayStock <= 0
                                     ? 'border-gray-200 opacity-60 hover:opacity-80' 
                                     : 'border-gray-200 hover:border-gray-400'
@@ -1696,7 +1698,7 @@ export default function ProductPage({ params }: ProductPageProps) {
                               }}
                               className={`${paddingClass} rounded-lg border-2 transition-all flex items-center ${gapClass} ${
                                 isSelected
-                                  ? 'border-gray-900 bg-gray-50'
+                                  ? 'border-green-500 bg-gray-50'
                                   : g.stock <= 0
                                     ? 'border-gray-200 opacity-60 hover:opacity-80'
                                     : 'border-gray-200 hover:border-gray-400'
@@ -1729,7 +1731,7 @@ export default function ProductPage({ params }: ProductPageProps) {
                     <label className="text-sm font-medium">{t(language, 'product.color')}:</label>
                     <div className="flex flex-wrap gap-2 items-center">
                       {colorGroups.map((g) => {
-                        const isSelected = selectedColor === g.color;
+                        const isSelected = selectedColor === g.color?.toLowerCase().trim();
                         const isDisabled = g.stock <= 0;
                         
                         return (
@@ -1737,12 +1739,12 @@ export default function ProductPage({ params }: ProductPageProps) {
                             <button 
                               onClick={() => !isDisabled && handleColorSelect(g.color)}
                               disabled={isDisabled}
-                              className={`w-10 h-10 rounded-full border-2 transition-all ${
+                              className={`w-10 h-10 rounded-full transition-all ${
                                 isSelected 
-                                  ? 'border-gray-900 ring-2 ring-offset-2 ring-gray-900 scale-110' 
+                                  ? 'border-[3px] border-green-500 scale-110' 
                                   : isDisabled 
-                                    ? 'border-gray-100 opacity-30 grayscale cursor-not-allowed' 
-                                    : 'border-gray-300 hover:scale-105'
+                                    ? 'border-2 border-gray-100 opacity-30 grayscale cursor-not-allowed' 
+                                    : 'border-2 border-gray-300 hover:scale-105'
                               }`}
                               style={{ backgroundColor: getColorValue(g.color) }} 
                               title={isDisabled ? `${getAttributeLabel(language, 'color', g.color)} (${t(language, 'product.outOfStock')})` : `${getAttributeLabel(language, 'color', g.color)}${g.stock > 0 ? ` (${g.stock} ${t(language, 'product.pcs')})` : ''}`} 
@@ -1783,7 +1785,7 @@ export default function ProductPage({ params }: ProductPageProps) {
                         disabled={isDisabled}
                         className={`min-w-[50px] px-3 py-2 rounded-lg border-2 transition-all ${
                           isSelected 
-                            ? 'border-gray-900 bg-gray-50' 
+                            ? 'border-green-500 bg-gray-50' 
                             : isDisabled 
                               ? 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed' 
                               : 'border-gray-200 hover:border-gray-400'
