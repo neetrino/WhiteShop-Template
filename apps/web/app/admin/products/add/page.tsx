@@ -3234,7 +3234,7 @@ function AddProductPageContent() {
 
       // Helper function to process images - keep URLs as is, filter out large base64
       const processImages = (images: string[]): { processed: string[]; skipped: number } => {
-        const MAX_BASE64_SIZE = 500 * 1024; // 500KB per image max
+        const MAX_BASE64_SIZE = 5 * 1024 * 1024; // 5MB per image max
         let skippedCount = 0;
         
         const processed = images.filter(img => {
@@ -3273,7 +3273,7 @@ function AddProductPageContent() {
       // Process main images with position preservation
       // This function processes each image individually and preserves original positions
       const processMainImagesWithPositions = (images: string[]): { mapping: (string | null)[]; skipped: number } => {
-        const MAX_BASE64_SIZE = 500 * 1024; // 500KB per image max
+        const MAX_BASE64_SIZE = 5 * 1024 * 1024; // 5MB per image max
         const mapping: (string | null)[] = [];
         let skippedCount = 0;
         
