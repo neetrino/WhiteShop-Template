@@ -7,11 +7,13 @@ import Link from 'next/link';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from '../../lib/i18n-client';
+import { Eye, EyeOff } from 'lucide-react';
 
 function LoginPageContent() {
   const { t } = useTranslation();
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -94,16 +96,30 @@ function LoginPageContent() {
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
               {t('login.form.password')}
             </label>
-            <Input
-              id="password"
-              type="password"
-              placeholder={t('login.form.passwordPlaceholder')}
-              className="w-full"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isSubmitting || isLoading}
-              required
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder={t('login.form.passwordPlaceholder')}
+                className="w-full pr-10"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isSubmitting || isLoading}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                disabled={isSubmitting || isLoading}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-5 w-5" />
+                ) : (
+                  <Eye className="h-5 w-5" />
+                )}
+              </button>
+            </div>
           </div>
           <div className="flex items-center justify-between">
             <label className="flex items-center">

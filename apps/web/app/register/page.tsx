@@ -5,6 +5,7 @@ import { Button, Input, Card } from '@shop/ui';
 import Link from 'next/link';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { useTranslation } from '../../lib/i18n-client';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function RegisterPage() {
   const { t } = useTranslation();
@@ -14,6 +15,8 @@ export default function RegisterPage() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -190,16 +193,30 @@ export default function RegisterPage() {
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
               {t('register.form.password')}
             </label>
-            <Input
-              id="password"
-              type="password"
-              placeholder={t('register.placeholders.password')}
-              className="w-full"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isSubmitting || isLoading}
-              required
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder={t('register.placeholders.password')}
+                className="w-full pr-10"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isSubmitting || isLoading}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                disabled={isSubmitting || isLoading}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-5 w-5" />
+                ) : (
+                  <Eye className="h-5 w-5" />
+                )}
+              </button>
+            </div>
             <p className="mt-1 text-xs text-gray-500">
               {t('register.passwordHint')}
             </p>
@@ -208,16 +225,30 @@ export default function RegisterPage() {
             <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
               {t('register.form.confirmPassword')}
             </label>
-            <Input
-              id="confirmPassword"
-              type="password"
-              placeholder={t('register.placeholders.confirmPassword')}
-              className="w-full"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              disabled={isSubmitting || isLoading}
-              required
-            />
+            <div className="relative">
+              <Input
+                id="confirmPassword"
+                type={showConfirmPassword ? 'text' : 'password'}
+                placeholder={t('register.placeholders.confirmPassword')}
+                className="w-full pr-10"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                disabled={isSubmitting || isLoading}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                disabled={isSubmitting || isLoading}
+              >
+                {showConfirmPassword ? (
+                  <EyeOff className="h-5 w-5" />
+                ) : (
+                  <Eye className="h-5 w-5" />
+                )}
+              </button>
+            </div>
           </div>
           <div className="flex items-start">
             <input
