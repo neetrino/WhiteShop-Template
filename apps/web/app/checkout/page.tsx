@@ -52,8 +52,6 @@ type CheckoutFormData = {
   paymentMethod: 'idram' | 'arca' | 'cash_on_delivery';
   shippingAddress?: string;
   shippingCity?: string;
-  shippingPostalCode?: string;
-  shippingPhone?: string;
   cardNumber?: string;
   cardExpiry?: string;
   cardCvv?: string;
@@ -114,8 +112,6 @@ export default function CheckoutPage() {
     // Shipping address fields - required only for delivery
     shippingAddress: z.string().optional(),
     shippingCity: z.string().optional(),
-    shippingPostalCode: z.string().optional(),
-    shippingPhone: z.string().optional(),
     // Payment details - optional, can be filled in modal
     cardNumber: z.string().optional(),
     cardExpiry: z.string().optional(),
@@ -137,30 +133,6 @@ export default function CheckoutPage() {
   }, {
     message: t('checkout.errors.cityRequired'),
     path: ['shippingCity'],
-  }).refine((data) => {
-    if (data.shippingMethod === 'delivery') {
-      return data.shippingPostalCode && data.shippingPostalCode.trim().length > 0;
-    }
-    return true;
-  }, {
-    message: t('checkout.errors.postalCodeRequired'),
-    path: ['shippingPostalCode'],
-  }).refine((data) => {
-    if (data.shippingMethod === 'delivery') {
-      return data.shippingPhone && data.shippingPhone.trim().length > 0;
-    }
-    return true;
-  }, {
-    message: t('checkout.errors.phoneRequiredDelivery'),
-    path: ['shippingPhone'],
-  }).refine((data) => {
-    if (data.shippingPhone && data.shippingPhone.trim().length > 0) {
-      return /^\+?[0-9]{8,15}$/.test(data.shippingPhone);
-    }
-    return true;
-  }, {
-    message: t('checkout.errors.invalidPhoneFormat'),
-    path: ['shippingPhone'],
   }).refine((data) => {
     if (data.paymentMethod === 'arca' || data.paymentMethod === 'idram') {
       return data.cardNumber && data.cardNumber.replace(/\s/g, '').length >= 13;
@@ -217,8 +189,6 @@ export default function CheckoutPage() {
       paymentMethod: 'cash_on_delivery',
       shippingAddress: '',
       shippingCity: '',
-      shippingPostalCode: '',
-      shippingPhone: '',
       cardNumber: '',
       cardExpiry: '',
       cardCvv: '',
@@ -323,7 +293,6 @@ export default function CheckoutPage() {
           }
           if (user.phone) {
             setValue('phone', user.phone);
-            setValue('shippingPhone', user.phone);
           }
         }
         
@@ -373,8 +342,6 @@ export default function CheckoutPage() {
           }
           if (profile.phone) {
             setValue('phone', profile.phone);
-            // Also set shipping phone if available
-            setValue('shippingPhone', profile.phone);
             console.log('📝 [CHECKOUT] Set phone:', profile.phone);
           }
           
@@ -386,7 +353,6 @@ export default function CheckoutPage() {
             if (defaultAddress) {
               console.log('🏠 [CHECKOUT] Auto-filling shipping address from saved address:', {
                 city: defaultAddress.city,
-                postalCode: defaultAddress.postalCode,
                 hasAddress: !!defaultAddress.addressLine1
               });
               
@@ -402,17 +368,6 @@ export default function CheckoutPage() {
               if (defaultAddress.city) {
                 setValue('shippingCity', defaultAddress.city);
                 console.log('📝 [CHECKOUT] Set shippingCity:', defaultAddress.city);
-              }
-              
-              if (defaultAddress.postalCode) {
-                setValue('shippingPostalCode', defaultAddress.postalCode);
-                console.log('📝 [CHECKOUT] Set shippingPostalCode:', defaultAddress.postalCode);
-              }
-              
-              // Use address phone if available, otherwise use user phone
-              if (defaultAddress.phone) {
-                setValue('shippingPhone', defaultAddress.phone);
-                console.log('📝 [CHECKOUT] Set shippingPhone from address:', defaultAddress.phone);
               }
             }
           }
@@ -582,15 +537,11 @@ export default function CheckoutPage() {
       const formData = watch();
       const hasShippingAddress = formData.shippingAddress && formData.shippingAddress.trim().length > 0;
       const hasShippingCity = formData.shippingCity && formData.shippingCity.trim().length > 0;
-      const hasShippingPostalCode = formData.shippingPostalCode && formData.shippingPostalCode.trim().length > 0;
-      const hasShippingPhone = formData.shippingPhone && formData.shippingPhone.trim().length > 0;
       
-      if (!hasShippingAddress || !hasShippingCity || !hasShippingPostalCode || !hasShippingPhone) {
+      if (!hasShippingAddress || !hasShippingCity) {
         console.log('[Checkout] Shipping address validation failed:', {
           hasShippingAddress,
-          hasShippingCity,
-          hasShippingPostalCode,
-          hasShippingPhone
+          hasShippingCity
         });
         setError(t('checkout.errors.fillShippingAddress'));
         // Scroll to shipping address section
@@ -646,14 +597,10 @@ export default function CheckoutPage() {
       // Prepare shipping address only for delivery
       const shippingAddress = data.shippingMethod === 'delivery' && 
         data.shippingAddress && 
-        data.shippingCity && 
-        data.shippingPostalCode &&
-        data.shippingPhone
+        data.shippingCity
         ? {
             address: data.shippingAddress,
             city: data.shippingCity,
-            postalCode: data.shippingPostalCode,
-            phone: data.shippingPhone,
           }
         : undefined;
 
@@ -874,19 +821,17 @@ export default function CheckoutPage() {
             {shippingMethod === 'delivery' && (
               <Card className="p-6" data-shipping-section>
                 <h2 className="text-xl font-semibold text-gray-900 mb-6">{t('checkout.shippingAddress')}</h2>
-                {(error && error.includes('shipping address')) || (errors.shippingAddress || errors.shippingCity || errors.shippingPostalCode || errors.shippingPhone) ? (
+                {(error && error.includes('shipping address')) || (errors.shippingAddress || errors.shippingCity) ? (
                   <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                     <p className="text-sm text-red-600">
                       {error && error.includes('shipping address') 
                         ? error 
                         : (errors.shippingAddress?.message || 
-                           errors.shippingCity?.message || 
-                           errors.shippingPostalCode?.message || 
-                           errors.shippingPhone?.message)}
+                           errors.shippingCity?.message)}
                     </p>
                   </div>
                 ) : null}
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Input
                       label={t('checkout.form.address')}
@@ -903,53 +848,19 @@ export default function CheckoutPage() {
                       disabled={isSubmitting}
                     />
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Input
-                        label={t('checkout.form.city')}
-                        type="text"
-                        placeholder={t('checkout.placeholders.city')}
-                        {...register('shippingCity', {
-                          onChange: () => {
-                            if (error && error.includes('shipping address')) {
-                              setError(null);
-                            }
-                          }
-                        })}
-                        error={errors.shippingCity?.message}
-                        disabled={isSubmitting}
-                      />
-                    </div>
-                    <div>
-                      <Input
-                        label={t('checkout.form.postalCode')}
-                        type="text"
-                        placeholder={t('checkout.placeholders.postalCode')}
-                        {...register('shippingPostalCode', {
-                          onChange: () => {
-                            if (error && error.includes('shipping address')) {
-                              setError(null);
-                            }
-                          }
-                        })}
-                        error={errors.shippingPostalCode?.message}
-                        disabled={isSubmitting}
-                      />
-                    </div>
-                  </div>
                   <div>
                     <Input
-                      label={t('checkout.form.phoneNumber')}
-                      type="tel"
-                      placeholder={t('checkout.placeholders.phone')}
-                      {...register('shippingPhone', {
+                      label={t('checkout.form.city')}
+                      type="text"
+                      placeholder={t('checkout.placeholders.city')}
+                      {...register('shippingCity', {
                         onChange: () => {
                           if (error && error.includes('shipping address')) {
                             setError(null);
                           }
                         }
                       })}
-                      error={errors.shippingPhone?.message}
+                      error={errors.shippingCity?.message}
                       disabled={isSubmitting}
                     />
                   </div>
@@ -1140,19 +1051,19 @@ export default function CheckoutPage() {
 
             {shippingMethod === 'delivery' ? (
               <>
-                <div className="space-y-4 mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900">{t('checkout.shippingAddress')}</h3>
-                  <div>
-                    <Input
-                      label={t('checkout.form.address')}
-                      type="text"
-                      placeholder={t('checkout.placeholders.address')}
-                      {...register('shippingAddress')}
-                      error={errors.shippingAddress?.message}
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('checkout.shippingAddress')}</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Input
+                        label={t('checkout.form.address')}
+                        type="text"
+                        placeholder={t('checkout.placeholders.address')}
+                        {...register('shippingAddress')}
+                        error={errors.shippingAddress?.message}
+                        disabled={isSubmitting}
+                      />
+                    </div>
                     <div>
                       <Input
                         label={t('checkout.form.city')}
@@ -1163,36 +1074,14 @@ export default function CheckoutPage() {
                         disabled={isSubmitting}
                       />
                     </div>
-                    <div>
-                      <Input
-                        label={t('checkout.form.postalCode')}
-                        type="text"
-                        placeholder={t('checkout.placeholders.postalCode')}
-                        {...register('shippingPostalCode')}
-                        error={errors.shippingPostalCode?.message}
-                        disabled={isSubmitting}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Input
-                      label={t('checkout.form.phoneNumber')}
-                      type="tel"
-                      placeholder={t('checkout.placeholders.phone')}
-                      {...register('shippingPhone')}
-                      error={errors.shippingPhone?.message}
-                      disabled={isSubmitting}
-                    />
                   </div>
                 </div>
 
-                {(errors.shippingAddress || errors.shippingCity || errors.shippingPostalCode || errors.shippingPhone) && (
+                {(errors.shippingAddress || errors.shippingCity) && (
                   <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                     <p className="text-sm text-red-600">
                       {errors.shippingAddress?.message || 
-                       errors.shippingCity?.message || 
-                       errors.shippingPostalCode?.message || 
-                       errors.shippingPhone?.message}
+                       errors.shippingCity?.message}
                     </p>
                   </div>
                 )}
