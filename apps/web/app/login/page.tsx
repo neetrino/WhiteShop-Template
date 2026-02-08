@@ -65,7 +65,7 @@ function LoginPageContent() {
   }, [isLoggedIn, isLoading, redirectTo, router]);
 
   return (
-    <div className="max-w-md mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div className="max-w-lg mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <Card className="p-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('login.title')}</h1>
         <p className="text-gray-600 mb-8">{t('login.subtitle')}</p>
@@ -165,7 +165,7 @@ function LoginPageContent() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="max-w-md mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="max-w-lg mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <Card className="p-8">
           <div className="animate-pulse">
             <div className="h-8 bg-gray-200 rounded w-3/4 mb-4"></div>
