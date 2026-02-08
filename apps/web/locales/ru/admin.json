@@ -548,6 +548,7 @@
     "loading": "Загрузка...",
     "loadingOrders": "Загрузка заказов...",
     "noOrders": "Заказы не найдены",
+    "searchPlaceholder": "Поиск по номеру заказа, клиенту, email, телефону...",
     "allStatuses": "Все статусы",
     "allPaymentStatuses": "Все статусы оплаты",
     "pending": "Ожидает",

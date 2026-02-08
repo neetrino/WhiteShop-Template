@@ -553,6 +553,7 @@
     "loading": "Loading...",
     "loadingOrders": "Loading orders...",
     "noOrders": "No orders found",
+    "searchPlaceholder": "Search by order number, customer, email, phone...",
     "allStatuses": "All Statuses",
     "allPaymentStatuses": "All Payment Statuses",
     "pending": "Pending",

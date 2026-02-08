@@ -34,6 +34,57 @@ interface OrdersResponse {
   };
 }
 
+interface OrderDetails {
+  id: string;
+  number: string;
+  status: string;
+  paymentStatus: string;
+  fulfillmentStatus: string;
+  total: number;
+  currency: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  customer?: {
+    id: string;
+    email: string | null;
+    phone: string | null;
+    firstName: string | null;
+    lastName: string | null;
+  } | null;
+  billingAddress?: any | null;
+  shippingAddress?: any | null;
+  shippingMethod?: string | null;
+  notes?: string | null;
+  adminNotes?: string | null;
+  payment?: {
+    id: string;
+    provider: string;
+    method?: string | null;
+    amount: number;
+    currency: string;
+    status: string;
+    cardLast4?: string | null;
+    cardBrand?: string | null;
+  } | null;
+  items: Array<{
+    id: string;
+    productTitle: string;
+    sku: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+    variantOptions?: Array<{
+      attributeKey?: string;
+      value?: string;
+      label?: string;
+      imageUrl?: string;
+      colors?: string[] | any;
+    }>;
+  }>;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export default function OrdersPage() {
   const { t } = useTranslation();
   const { isLoggedIn, isAdmin, isLoading } = useAuth();
@@ -43,6 +94,7 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState<OrdersResponse['meta'] | null>(null);
   const [sortBy, setSortBy] = useState<string>('createdAt');
@@ -52,14 +104,19 @@ export default function OrdersPage() {
   const [updateMessage, setUpdateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
+  const [loadingOrderDetails, setLoadingOrderDetails] = useState(false);
 
   // Initialize filters from URL params on mount and when URL changes
   useEffect(() => {
     if (searchParams) {
       const status = searchParams.get('status') || '';
       const paymentStatus = searchParams.get('paymentStatus') || '';
+      const search = searchParams.get('search') || '';
       setStatusFilter(status);
       setPaymentStatusFilter(paymentStatus);
+      setSearchQuery(search);
     }
   }, [searchParams]);
 
@@ -75,7 +132,7 @@ export default function OrdersPage() {
   const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('📦 [ADMIN] Fetching orders...', { page, statusFilter, paymentStatusFilter, sortBy, sortOrder });
+      console.log('📦 [ADMIN] Fetching orders...', { page, statusFilter, paymentStatusFilter, searchQuery, sortBy, sortOrder });
       
       const response = await apiClient.get<OrdersResponse>('/api/v1/admin/orders', {
         params: {
@@ -83,6 +140,7 @@ export default function OrdersPage() {
           limit: '20',
           status: statusFilter || '',
           paymentStatus: paymentStatusFilter || '',
+          search: searchQuery || '',
           sortBy: sortBy || '',
           sortOrder: sortOrder || '',
         },
@@ -96,14 +154,14 @@ export default function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter, paymentStatusFilter, sortBy, sortOrder]);
+  }, [page, statusFilter, paymentStatusFilter, searchQuery, sortBy, sortOrder]);
 
   useEffect(() => {
     if (isLoggedIn && isAdmin) {
       fetchOrders();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoggedIn, isAdmin, page, statusFilter, paymentStatusFilter, sortBy, sortOrder]);
+  }, [isLoggedIn, isAdmin, page, statusFilter, paymentStatusFilter, searchQuery, sortBy, sortOrder]);
 
   const formatCurrency = (amount: number, currency: string = 'USD') => {
     return new Intl.NumberFormat('en-US', {
@@ -111,6 +169,40 @@ export default function OrdersPage() {
       currency: currency,
       minimumFractionDigits: 0,
     }).format(amount);
+  };
+
+  // Helper function to get color hex/rgb from color name
+  const getColorValue = (colorName: string): string => {
+    const colorMap: Record<string, string> = {
+      'beige': '#F5F5DC', 'black': '#000000', 'blue': '#0000FF', 'brown': '#A52A2A',
+      'gray': '#808080', 'grey': '#808080', 'green': '#008000', 'red': '#FF0000',
+      'white': '#FFFFFF', 'yellow': '#FFFF00', 'orange': '#FFA500', 'pink': '#FFC0CB',
+      'purple': '#800080', 'navy': '#000080', 'maroon': '#800000', 'olive': '#808000',
+      'teal': '#008080', 'cyan': '#00FFFF', 'magenta': '#FF00FF', 'lime': '#00FF00',
+      'silver': '#C0C0C0', 'gold': '#FFD700',
+    };
+    const normalizedName = colorName.toLowerCase().trim();
+    return colorMap[normalizedName] || '#CCCCCC';
+  };
+
+  const handleViewOrderDetails = async (orderId: string) => {
+    setSelectedOrderId(orderId);
+    setLoadingOrderDetails(true);
+    try {
+      const response = await apiClient.get<OrderDetails>(`/api/v1/admin/orders/${orderId}`);
+      setOrderDetails(response);
+    } catch (err: any) {
+      console.error('❌ [ADMIN] Failed to load order details:', err);
+      alert(err?.message || t('admin.orders.orderDetails.failedToLoad'));
+      setSelectedOrderId(null);
+    } finally {
+      setLoadingOrderDetails(false);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setSelectedOrderId(null);
+    setOrderDetails(null);
   };
 
   const getStatusColor = (status: string) => {
@@ -388,6 +480,26 @@ export default function OrdersPage() {
               <option value="pending">{t('admin.orders.pendingPayment')}</option>
               <option value="failed">{t('admin.orders.failed')}</option>
             </select>
+            <input
+              type="text"
+              placeholder={t('admin.orders.searchPlaceholder')}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 min-w-[200px]"
+              value={searchQuery}
+              onChange={(e) => {
+                const newSearch = e.target.value;
+                setSearchQuery(newSearch);
+                setPage(1);
+                // Update URL without causing navigation
+                const params = new URLSearchParams(searchParams?.toString() || '');
+                if (newSearch.trim()) {
+                  params.set('search', newSearch.trim());
+                } else {
+                  params.delete('search');
+                }
+                const newUrl = params.toString() ? `/admin/orders?${params.toString()}` : '/admin/orders';
+                router.push(newUrl, { scroll: false });
+              }}
+            />
             {updateMessage && (
               <div
                 className={`px-4 py-2 rounded-md text-sm ${
@@ -403,20 +515,22 @@ export default function OrdersPage() {
         </Card>
 
         {/* Selection Controls */}
-        <Card className="p-4 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-700">
-              {t('admin.orders.selectedOrders').replace('{count}', selectedIds.size.toString())}
+        {selectedIds.size > 0 && (
+          <Card className="p-4 mb-6">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-700">
+                {t('admin.orders.selectedOrders').replace('{count}', selectedIds.size.toString())}
+              </div>
+              <Button
+                variant="outline"
+                onClick={handleBulkDelete}
+                disabled={bulkDeleting}
+              >
+                {bulkDeleting ? t('admin.orders.deleting') : t('admin.orders.deleteSelected')}
+              </Button>
             </div>
-            <Button
-              variant="outline"
-              onClick={handleBulkDelete}
-              disabled={selectedIds.size === 0 || bulkDeleting}
-            >
-              {bulkDeleting ? t('admin.orders.deleting') : t('admin.orders.deleteSelected')}
-            </Button>
-          </div>
-        </Card>
+          </Card>
+        )}
 
         {/* Orders Table */}
         <Card className="p-6">
@@ -519,17 +633,15 @@ export default function OrdersPage() {
                             onChange={() => toggleSelect(order.id)}
                           />
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td 
+                          className="px-6 py-4 whitespace-nowrap cursor-pointer hover:bg-gray-50"
+                          onClick={() => handleViewOrderDetails(order.id)}
+                        >
                           <div className="text-sm font-medium text-gray-900">{order.number}</div>
                         </td>
                         <td
                           className="px-6 py-4 whitespace-nowrap cursor-pointer hover:bg-gray-50"
-                          onClick={() => {
-                            console.log('📂 [ADMIN][Orders] Navigate to order details page', {
-                              orderId: order.id,
-                            });
-                            router.push(`/admin/orders/${order.id}`);
-                          }}
+                          onClick={() => handleViewOrderDetails(order.id)}
                         >
                           <div className="text-sm font-medium text-gray-900">
                             {[order.customerFirstName, order.customerLastName].filter(Boolean).join(' ') || t('admin.orders.unknownCustomer')}
@@ -622,6 +734,270 @@ export default function OrdersPage() {
             </>
           )}
         </Card>
+
+        {/* Order Details Modal */}
+        {selectedOrderId && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            onClick={handleCloseModal}
+          >
+            <div
+              className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {t('admin.orders.orderDetails.title')} {orderDetails ? `#${orderDetails.number}` : ''}
+                </h2>
+                <button
+                  onClick={handleCloseModal}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label={t('admin.common.close')}
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-6">
+                {loadingOrderDetails ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+                    <p className="text-gray-600">{t('admin.orders.orderDetails.loadingOrderDetails')}</p>
+                  </div>
+                ) : orderDetails ? (
+                  <div className="space-y-6">
+                    {/* Summary */}
+                    <Card className="p-4 md:p-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <h3 className="text-sm font-semibold text-gray-900 mb-2">{t('admin.orders.orderDetails.summary')}</h3>
+                          <div className="text-sm text-gray-700 space-y-1">
+                            <div>
+                              <span className="font-medium">{t('admin.orders.orderDetails.orderNumber')}</span> {orderDetails.number}
+                            </div>
+                            <div>
+                              <span className="font-medium">{t('admin.orders.orderDetails.total')}</span>{' '}
+                              {formatCurrency(orderDetails.total, orderDetails.currency || 'AMD')}
+                            </div>
+                            <div>
+                              <span className="font-medium">{t('admin.orders.orderDetails.status')}</span> {orderDetails.status}
+                            </div>
+                            <div>
+                              <span className="font-medium">{t('admin.orders.orderDetails.payment')}</span> {orderDetails.paymentStatus}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h3 className="text-sm font-semibold text-gray-900 mb-2">{t('admin.orders.orderDetails.customer')}</h3>
+                          <div className="text-sm text-gray-700 space-y-1">
+                            <div>
+                              {(orderDetails.customer?.firstName || '') +
+                                (orderDetails.customer?.lastName ? ' ' + orderDetails.customer.lastName : '') ||
+                                t('admin.orders.unknownCustomer')}
+                            </div>
+                            {orderDetails.customerPhone && <div>{orderDetails.customerPhone}</div>}
+                            {orderDetails.customerEmail && <div>{orderDetails.customerEmail}</div>}
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+
+                    {/* Addresses & Payment */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <Card className="p-4 md:p-6">
+                        <h3 className="text-sm font-semibold text-gray-900 mb-2">{t('admin.orders.orderDetails.shippingAddress')}</h3>
+                        {orderDetails.shippingMethod === 'pickup' ? (
+                          <div className="text-sm text-gray-700 space-y-1">
+                            <div>
+                              <span className="font-medium">{t('admin.orders.orderDetails.shippingMethod')}</span>{' '}
+                              {t('admin.orders.orderDetails.pickup')}
+                            </div>
+                          </div>
+                        ) : orderDetails.shippingMethod === 'delivery' && orderDetails.shippingAddress ? (
+                          <div className="text-sm text-gray-700 space-y-1">
+                            <div className="mb-2">
+                              <span className="font-medium">{t('admin.orders.orderDetails.shippingMethod')}</span>{' '}
+                              {t('checkout.shipping.delivery')}
+                            </div>
+                            {(orderDetails.shippingAddress.address || orderDetails.shippingAddress.addressLine1) && (
+                              <div>
+                                <span className="font-medium">{t('checkout.form.address')}:</span>{' '}
+                                {orderDetails.shippingAddress.address || orderDetails.shippingAddress.addressLine1}
+                                {orderDetails.shippingAddress.addressLine2 && `, ${orderDetails.shippingAddress.addressLine2}`}
+                              </div>
+                            )}
+                            {orderDetails.shippingAddress.city && (
+                              <div>
+                                <span className="font-medium">{t('checkout.form.city')}:</span> {orderDetails.shippingAddress.city}
+                              </div>
+                            )}
+                            {orderDetails.shippingAddress.postalCode && (
+                              <div>
+                                <span className="font-medium">{t('checkout.form.postalCode')}:</span> {orderDetails.shippingAddress.postalCode}
+                              </div>
+                            )}
+                            {(orderDetails.shippingAddress.phone || orderDetails.shippingAddress.shippingPhone) && (
+                              <div className="mt-2">
+                                <span className="font-medium">{t('checkout.form.phoneNumber')}:</span>{' '}
+                                {orderDetails.shippingAddress.phone || orderDetails.shippingAddress.shippingPhone}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-500">
+                            <p>{t('admin.orders.orderDetails.noShippingAddress')}</p>
+                            {orderDetails.shippingMethod && (
+                              <p>
+                                {t('admin.orders.orderDetails.shippingMethod')}{' '}
+                                {orderDetails.shippingMethod === 'pickup' 
+                                  ? t('admin.orders.orderDetails.pickup')
+                                  : orderDetails.shippingMethod === 'delivery'
+                                  ? t('checkout.shipping.delivery')
+                                  : orderDetails.shippingMethod}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </Card>
+
+                      <Card className="p-4 md:p-6">
+                        <h3 className="text-sm font-semibold text-gray-900 mb-2">{t('admin.orders.orderDetails.paymentInfo')}</h3>
+                        {orderDetails.payment ? (
+                          <div className="text-sm text-gray-700 space-y-1">
+                            {orderDetails.payment.method && <div>{t('admin.orders.orderDetails.method')} {orderDetails.payment.method}</div>}
+                            <div>
+                              {t('admin.orders.orderDetails.amount')}{' '}
+                              {formatCurrency(orderDetails.payment.amount, orderDetails.payment.currency || 'AMD')}
+                            </div>
+                            <div>{t('admin.orders.orderDetails.status')} {orderDetails.payment.status}</div>
+                            {orderDetails.payment.cardBrand && orderDetails.payment.cardLast4 && (
+                              <div>
+                                {t('admin.orders.orderDetails.card')} {orderDetails.payment.cardBrand} ••••{orderDetails.payment.cardLast4}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-500">{t('admin.orders.orderDetails.noPaymentInfo')}</div>
+                        )}
+                      </Card>
+                    </div>
+
+                    {/* Items */}
+                    <Card className="p-4 md:p-6">
+                      <h3 className="text-sm font-semibold text-gray-900 mb-3">{t('admin.orders.orderDetails.items')}</h3>
+                      {Array.isArray(orderDetails.items) && orderDetails.items.length > 0 ? (
+                        <div className="overflow-x-auto border border-gray-200 rounded-md">
+                          <table className="min-w-full text-sm">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-3 py-2 text-left font-medium text-gray-500">{t('admin.orders.orderDetails.product')}</th>
+                                <th className="px-3 py-2 text-left font-medium text-gray-500">{t('admin.orders.orderDetails.sku')}</th>
+                                <th className="px-3 py-2 text-left font-medium text-gray-500">{t('admin.orders.orderDetails.colorSize')}</th>
+                                <th className="px-3 py-2 text-right font-medium text-gray-500">{t('admin.orders.orderDetails.qty')}</th>
+                                <th className="px-3 py-2 text-right font-medium text-gray-500">{t('admin.orders.orderDetails.price')}</th>
+                                <th className="px-3 py-2 text-right font-medium text-gray-500">{t('admin.orders.orderDetails.totalCol')}</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 bg-white">
+                              {orderDetails.items.map((item) => {
+                                // Get all variant options (not just color and size)
+                                const allOptions = item.variantOptions || [];
+                                
+                                // Helper to check if colors array is valid
+                                const getColorsArray = (colors: any): string[] => {
+                                  if (!colors) return [];
+                                  if (Array.isArray(colors)) return colors;
+                                  if (typeof colors === 'string') {
+                                    try {
+                                      const parsed = JSON.parse(colors);
+                                      return Array.isArray(parsed) ? parsed : [];
+                                    } catch {
+                                      return [];
+                                    }
+                                  }
+                                  return [];
+                                };
+
+                                return (
+                                  <tr key={item.id}>
+                                    <td className="px-3 py-2">{item.productTitle}</td>
+                                    <td className="px-3 py-2 text-gray-500">{item.sku}</td>
+                                    <td className="px-3 py-2">
+                                      {allOptions.length > 0 ? (
+                                        <div className="flex flex-wrap gap-2 items-center">
+                                          {allOptions.map((opt, optIndex) => {
+                                            if (!opt.attributeKey || !opt.value) return null;
+                                            
+                                            const attributeKey = opt.attributeKey.toLowerCase().trim();
+                                            const isColor = attributeKey === 'color' || attributeKey === 'colour';
+                                            const displayLabel = opt.label || opt.value;
+                                            const hasImage = opt.imageUrl && opt.imageUrl.trim() !== '';
+                                            const colors = getColorsArray(opt.colors);
+                                            const colorHex = colors.length > 0 ? colors[0] : (isColor ? getColorValue(opt.value) : null);
+                                            
+                                            return (
+                                              <div key={optIndex} className="flex items-center gap-1.5">
+                                                {/* Show image if available */}
+                                                {hasImage ? (
+                                                  <img 
+                                                    src={opt.imageUrl!} 
+                                                    alt={displayLabel}
+                                                    className="w-4 h-4 rounded border border-gray-300 object-cover flex-shrink-0"
+                                                    onError={(e) => {
+                                                      // Fallback to color circle if image fails to load
+                                                      (e.target as HTMLImageElement).style.display = 'none';
+                                                    }}
+                                                  />
+                                                ) : isColor && colorHex ? (
+                                                  <div 
+                                                    className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0"
+                                                    style={{ backgroundColor: colorHex }}
+                                                    title={displayLabel}
+                                                  />
+                                                ) : null}
+                                                <span className="text-xs text-gray-700 capitalize">
+                                                  {displayLabel}
+                                                </span>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      ) : (
+                                        <span className="text-xs text-gray-400">—</span>
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-2 text-right">{item.quantity}</td>
+                                    <td className="px-3 py-2 text-right">
+                                      {formatCurrency(item.unitPrice, orderDetails.currency || 'AMD')}
+                                    </td>
+                                    <td className="px-3 py-2 text-right">
+                                      {formatCurrency(item.total, orderDetails.currency || 'AMD')}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-500">{t('admin.orders.orderDetails.noItemsFound')}</div>
+                      )}
+                    </Card>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-gray-600">{t('admin.orders.orderDetails.failedToLoad')}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

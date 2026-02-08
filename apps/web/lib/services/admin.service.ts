@@ -258,6 +258,7 @@ class AdminService {
     limit?: number;
     status?: string;
     paymentStatus?: string;
+    search?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
   } = {}) {
@@ -267,14 +268,44 @@ class AdminService {
 
     const where: any = {};
 
+    // Build AND conditions array
+    const andConditions: any[] = [];
+
     // Apply status filter
     if (filters.status) {
-      where.status = filters.status;
+      andConditions.push({ status: filters.status });
     }
 
     // Apply payment status filter
     if (filters.paymentStatus) {
-      where.paymentStatus = filters.paymentStatus;
+      andConditions.push({ paymentStatus: filters.paymentStatus });
+    }
+
+    // Apply search filter
+    if (filters.search && filters.search.trim()) {
+      const searchTerm = filters.search.trim();
+      andConditions.push({
+        OR: [
+          { number: { contains: searchTerm, mode: 'insensitive' } },
+          { customerEmail: { contains: searchTerm, mode: 'insensitive' } },
+          { customerPhone: { contains: searchTerm, mode: 'insensitive' } },
+          {
+            user: {
+              OR: [
+                { firstName: { contains: searchTerm, mode: 'insensitive' } },
+                { lastName: { contains: searchTerm, mode: 'insensitive' } },
+                { email: { contains: searchTerm, mode: 'insensitive' } },
+                { phone: { contains: searchTerm, mode: 'insensitive' } },
+              ],
+            },
+          },
+        ],
+      });
+    }
+
+    // Apply AND conditions if any exist
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
     }
 
     // Determine sort field and order
