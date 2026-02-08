@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import type { FormEvent, ChangeEvent } from 'react';
 import { getStoredLanguage } from '@/lib/language';
 import { useTranslation } from '../../lib/i18n-client';
+import { apiClient } from '../../lib/api-client';
 import contactData from '../../../../config/contact.json';
 
 // Icons
@@ -36,6 +37,7 @@ export default function ContactPage() {
     subject: '',
     message: '',
   });
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const storedLang = getStoredLanguage();
@@ -47,11 +49,35 @@ export default function ContactPage() {
     }
   }, []);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    // Handle form submission here
-    console.log('Form submitted:', formData);
-    // You can add API call here
+    setSubmitting(true);
+    
+    try {
+      await apiClient.post('/api/v1/contact', {
+        name: formData.name,
+        email: formData.email,
+        subject: formData.subject,
+        message: formData.message,
+      }, {
+        skipAuth: true, // Contact form doesn't require authentication
+      });
+      
+      // Reset form
+      setFormData({
+        name: '',
+        email: '',
+        subject: '',
+        message: '',
+      });
+      
+      alert(t('contact.form.submitSuccess') || 'Ձեր հաղորդագրությունը հաջողությամբ ուղարկվեց');
+    } catch (error: any) {
+      console.error('Error submitting contact form:', error);
+      alert(t('contact.form.submitError') || 'Սխալ: ' + (error.message || 'Չհաջողվեց ուղարկել հաղորդագրությունը'));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -182,8 +208,9 @@ export default function ContactPage() {
                 type="submit"
                 variant="primary"
                 className="w-full bg-gray-900 text-white hover:bg-gray-800 rounded-md py-3 font-semibold uppercase tracking-wide"
+                disabled={submitting}
               >
-                {t('contact.form.submit')}
+                {submitting ? (t('contact.form.submitting') || 'Ուղարկվում է...') : t('contact.form.submit')}
               </Button>
             </form>
           </div>

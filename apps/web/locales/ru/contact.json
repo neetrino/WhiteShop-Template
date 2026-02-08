@@ -24,7 +24,10 @@
     "subjectPlaceholder": "О чем это?",
     "message": "Сообщение",
     "messagePlaceholder": "Ваше сообщение...",
-    "submit": "Отправить"
+    "submit": "Отправить",
+    "submitting": "Отправка...",
+    "submitSuccess": "Ваше сообщение успешно отправлено",
+    "submitError": "Ошибка: Не удалось отправить сообщение"
   }
 }
 

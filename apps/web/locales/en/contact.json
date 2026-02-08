@@ -24,7 +24,10 @@
     "subjectPlaceholder": "What is this about?",
     "message": "Message",
     "messagePlaceholder": "Your message...",
-    "submit": "Submit"
+    "submit": "Submit",
+    "submitting": "Submitting...",
+    "submitSuccess": "Your message has been sent successfully",
+    "submitError": "Error: Failed to send message"
   }
 }
 

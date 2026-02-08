@@ -8,6 +8,7 @@
     "attributes": "Attributes",
     "discounts": "Discounts",
     "users": "Users",
+    "messages": "Messages",
     "analytics": "Analytics",
     "filterByPrice": "Filter by Price",
     "delivery": "Delivery",
@@ -622,6 +623,28 @@
       "totalCol": "Total",
       "noItemsFound": "No items found for this order"
     }
+  },
+  "messages": {
+    "title": "Messages",
+    "backToAdmin": "Back to Admin Panel",
+    "loadingMessages": "Loading messages...",
+    "noMessages": "No messages found",
+    "name": "Name",
+    "email": "Email",
+    "subject": "Subject",
+    "message": "Message",
+    "date": "Date",
+    "selectAll": "Select all",
+    "selectMessage": "Select message {email}",
+    "selectedMessages": "Selected {count} messages",
+    "deleteSelected": "Delete selected",
+    "deleting": "Deleting...",
+    "deleteConfirm": "Delete {count} selected messages?",
+    "deletedSuccess": "Messages deleted successfully",
+    "failedToDelete": "Failed to delete messages",
+    "showingPage": "Showing page {page} of {totalPages} ({total} total)",
+    "previous": "Previous",
+    "next": "Next"
   },
   "common": {
     "loading": "Loading...",
