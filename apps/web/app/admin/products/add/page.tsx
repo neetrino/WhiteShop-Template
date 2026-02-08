@@ -147,7 +147,6 @@ function AddProductPageContent() {
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   const [newBrandName, setNewBrandName] = useState('');
   const [newCategoryName, setNewCategoryName] = useState('');
-  const [newCategoryRequiresSizes, setNewCategoryRequiresSizes] = useState(false);
   const [useNewBrand, setUseNewBrand] = useState(false);
   const [useNewCategory, setUseNewCategory] = useState(false);
   const [newColorName, setNewColorName] = useState('');
@@ -815,7 +814,6 @@ function AddProductPageContent() {
           setUseNewCategory(false);
           setNewBrandName('');
           setNewCategoryName('');
-          setNewCategoryRequiresSizes(false);
           
           // Store product variants temporarily to convert after attributes are loaded
           // We'll convert them in a separate useEffect that waits for attributes
@@ -1399,12 +1397,6 @@ function AddProductPageContent() {
 
   // Check if selected category requires sizes
   const isClothingCategory = () => {
-    // If adding new category and requiresSizes is checked, return true
-    if (useNewCategory && newCategoryRequiresSizes) {
-      console.log('🔍 [VALIDATION] isClothingCategory: true (new category with requiresSizes)');
-      return true;
-    }
-    
     // If no category selected, return false
     if (!formData.primaryCategoryId) {
       console.log('🔍 [VALIDATION] isClothingCategory: false (no category selected)');
@@ -1925,21 +1917,19 @@ function AddProductPageContent() {
       let finalPrimaryCategoryId = formData.primaryCategoryId;
       if (useNewCategory && newCategoryName.trim()) {
         try {
-          console.log('📁 [ADMIN] Creating new category:', newCategoryName, 'requiresSizes:', newCategoryRequiresSizes);
+          console.log('📁 [ADMIN] Creating new category:', newCategoryName);
           const categoryResponse = await apiClient.post<{ data: Category }>('/api/v1/admin/categories', {
             title: newCategoryName.trim(),
             locale: 'en',
-            requiresSizes: newCategoryRequiresSizes,
+            requiresSizes: false,
           });
           if (categoryResponse.data) {
             finalPrimaryCategoryId = categoryResponse.data.id;
             // Add to categories list for future use
             setCategories((prev) => [...prev, categoryResponse.data]);
-            console.log('✅ [ADMIN] Category created:', categoryResponse.data.id, 'requiresSizes:', categoryResponse.data.requiresSizes);
+            console.log('✅ [ADMIN] Category created:', categoryResponse.data.id);
             creationMessages.push(
-              newCategoryRequiresSizes 
-                ? t('admin.products.add.categoryCreatedSuccessSizes').replace('{name}', newCategoryName.trim())
-                : t('admin.products.add.categoryCreatedSuccess').replace('{name}', newCategoryName.trim())
+              t('admin.products.add.categoryCreatedSuccess').replace('{name}', newCategoryName.trim())
             );
           }
         } catch (err: any) {
@@ -3454,7 +3444,6 @@ function AddProductPageContent() {
                         onChange={() => {
                           setUseNewCategory(false);
                           setNewCategoryName('');
-                          setNewCategoryRequiresSizes(false);
                         }}
                         className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                       />
@@ -3470,7 +3459,6 @@ function AddProductPageContent() {
                         checked={useNewCategory}
                         onChange={() => {
                           setUseNewCategory(true);
-                          setNewCategoryRequiresSizes(false);
                         }}
                         className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                       />
@@ -3612,17 +3600,6 @@ function AddProductPageContent() {
                           placeholder={t('admin.products.add.enterNewCategoryName')}
                           className="w-full"
                         />
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={newCategoryRequiresSizes}
-                            onChange={(e) => setNewCategoryRequiresSizes(e.target.checked)}
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                          />
-                          <span className="text-sm text-gray-700">
-                            {t('admin.products.add.categoryRequiresSizes')}
-                          </span>
-                        </label>
                       </div>
                     )}
                   </div>
