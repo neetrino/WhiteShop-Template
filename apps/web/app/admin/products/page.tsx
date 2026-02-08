@@ -2,10 +2,12 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import type { FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/AuthContext';
 import { Card, Button } from '@shop/ui';
 import { apiClient } from '../../../lib/api-client';
+import { AdminMenuDrawer } from '../../../components/AdminMenuDrawer';
+import { getAdminMenuTABS } from '../admin-menu.config';
 import { useTranslation } from '../../../lib/i18n-client';
 import { formatPrice, getStoredCurrency, initializeCurrencyRates, type CurrencyCode } from '../../../lib/currency';
 
@@ -49,6 +51,7 @@ export default function ProductsPage() {
   const { t } = useTranslation();
   const { isLoggedIn, isAdmin, isLoading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -514,6 +517,9 @@ export default function ProductsPage() {
     return null;
   }
 
+  const adminTabs = getAdminMenuTABS(t);
+  const currentPath = pathname || '/admin/products';
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -547,6 +553,43 @@ export default function ProductsPage() {
           </div>
         </div>
 
+        <div className="flex flex-col lg:flex-row gap-8">
+          <div className="lg:hidden mb-6">
+            <AdminMenuDrawer tabs={adminTabs} currentPath={currentPath} />
+          </div>
+          {/* Sidebar Navigation */}
+          <aside className="hidden lg:block lg:w-64 flex-shrink-0">
+            <nav className="bg-white border border-gray-200 rounded-lg p-2 space-y-1">
+              {adminTabs.map((tab) => {
+                const isActive = currentPath === tab.path || 
+                  (tab.path === '/admin' && currentPath === '/admin') ||
+                  (tab.path !== '/admin' && currentPath.startsWith(tab.path));
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      router.push(tab.path);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-md text-sm font-medium transition-all ${
+                      tab.isSubCategory ? 'pl-12' : ''
+                    } ${
+                      isActive
+                        ? 'bg-gray-900 text-white'
+                        : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                    }`}
+                  >
+                    <span className={`flex-shrink-0 ${isActive ? 'text-white' : 'text-gray-500'}`}>
+                      {tab.icon}
+                    </span>
+                    <span className="text-left">{tab.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </aside>
+
+          {/* Main Content */}
+          <div className="flex-1 min-w-0">
         {/* Search and Filters */}
         <div className="space-y-4 mb-6">
           {/* Search Fields */}
@@ -734,7 +777,7 @@ export default function ProductsPage() {
                           onChange={toggleSelectAll}
                         />
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         <button
                           type="button"
                           onClick={() => handleHeaderSort('title')}
@@ -769,7 +812,7 @@ export default function ProductsPage() {
                           </span>
                         </button> 
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         <button
                           type="button"
                           onClick={() => handleHeaderSort('stock')}
@@ -804,7 +847,7 @@ export default function ProductsPage() {
                           </span>
                         </button>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         <button
                           type="button"
                           onClick={() => handleHeaderSort('price')}
@@ -839,13 +882,7 @@ export default function ProductsPage() {
                           </span>
                         </button>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t('admin.products.status')}
-                      </th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t('admin.products.featured')}
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         <button
                           type="button"
                           onClick={() => handleHeaderSort('createdAt')}
@@ -880,7 +917,10 @@ export default function ProductsPage() {
                           </span>
                         </button>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        {t('admin.products.featured')}
+                      </th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider pl-6">
                         {t('admin.products.actions')}
                       </th>
                     </tr>
@@ -896,7 +936,7 @@ export default function ProductsPage() {
                             onChange={() => toggleSelect(product.id)}
                           />
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-3 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             {product.image && (
                               <img
@@ -911,8 +951,8 @@ export default function ProductsPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          {product.colorStocks && product.  colorStocks.length > 0 ? (
+                        <td className="px-3 py-4">
+                          {product.colorStocks && product.colorStocks.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
                               {product.colorStocks.map((colorStock) => (
                                 <div
@@ -930,7 +970,7 @@ export default function ProductsPage() {
                             </span>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-3 py-4 whitespace-nowrap">
                           <div className="flex flex-col">
                             <div className="text-sm font-medium text-gray-900">
                               {formatPrice(product.price, currency)}
@@ -948,26 +988,10 @@ export default function ProductsPage() {
                             ) : null}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <button
-                            type="button"
-                            onClick={() => handleTogglePublished(product.id, product.published, product.title)}
-                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                              product.published
-                                ? 'bg-green-500'
-                                : 'bg-gray-300'
-                            }`}
-                            title={product.published ? t('admin.products.clickToDraft') : t('admin.products.clickToPublished')}
-                            aria-label={product.published ? `${t('admin.products.published')} - ${t('admin.products.clickToDraft')}` : `${t('admin.products.draft')} - ${t('admin.products.clickToPublished')}`}
-                          >
-                            <span
-                              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform duration-200 ${
-                                product.published ? 'translate-x-[18px]' : 'translate-x-0.5'
-                              }`}
-                            />
-                          </button>
+                        <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(product.createdAt).toLocaleDateString('hy-AM')}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <td className="px-3 py-4 whitespace-nowrap text-center">
                           <button
                             onClick={() => handleToggleFeatured(product.id, product.featured || false, product.title)}
                             className="inline-flex items-center justify-center w-8 h-8 transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
@@ -991,11 +1015,8 @@ export default function ProductsPage() {
                             </svg>
                           </button>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(product.createdAt).toLocaleDateString('hy-AM')}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <div className="flex items-center gap-2">
+                        <td className="px-3 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex items-center gap-1 flex-wrap">
                             <Button
                               variant="ghost"
                               size="sm"
@@ -1018,6 +1039,23 @@ export default function ProductsPage() {
                               </svg>
                               {t('admin.products.delete')}
                             </Button>
+                            <button
+                              type="button"
+                              onClick={() => handleTogglePublished(product.id, product.published, product.title)}
+                              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                                product.published
+                                  ? 'bg-green-500'
+                                  : 'bg-gray-300'
+                              }`}
+                              title={product.published ? t('admin.products.clickToDraft') : t('admin.products.clickToPublished')}
+                              aria-label={product.published ? `${t('admin.products.published')} - ${t('admin.products.clickToDraft')}` : `${t('admin.products.draft')} - ${t('admin.products.clickToPublished')}`}
+                            >
+                              <span
+                                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform duration-200 ${
+                                  product.published ? 'translate-x-[18px]' : 'translate-x-0.5'
+                                }`}
+                              />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1053,6 +1091,8 @@ export default function ProductsPage() {
             </>
           )}
         </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

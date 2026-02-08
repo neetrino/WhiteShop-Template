@@ -14,12 +14,12 @@
     "settings": "Настройки"
   },
   "dashboard": {
-    "title": "Панель администратора",
+    "title": "Админ страница",
     "welcome": "Добро пожаловать, {name}!",
-    "totalUsers": "Всего пользователей",
-    "totalProducts": "Всего товаров",
+    "totalUsers": "пользователей",
+    "totalProducts": "товаров",
     "lowStock": "{count} низкий запас",
-    "totalOrders": "Всего заказов",
+    "totalOrders": "заказов",
     "pending": "{count} ожидает",
     "revenue": "Доход",
     "recentOrders": "Недавние заказы",

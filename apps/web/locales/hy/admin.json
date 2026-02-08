@@ -1,6 +1,6 @@
 {
   "menu": {
-    "dashboard": "Վահան",
+    "dashboard": "Վահանակ",
     "orders": "Պատվերներ",
     "products": "Ապրանքներ",
     "categories": "Կատեգորիաներ",
@@ -14,12 +14,12 @@
     "settings": "Կարգավորումներ"
   },
   "dashboard": {
-    "title": "Ադմինիստրատորի վահան",
+    "title": "Ադմին էջ",
     "welcome": "Բարի վերադարձ, {name}!",
-    "totalUsers": "Ընդամենը օգտատերեր",
-    "totalProducts": "Ընդամենը ապրանքներ",
+    "totalUsers": "օգտատերեր",
+    "totalProducts": " ապրանքներ",
     "lowStock": "{count} ցածր պաշար",
-    "totalOrders": "Ընդամենը պատվերներ",
+    "totalOrders": "պատվերներ",
     "pending": "{count} սպասվող",
     "revenue": "Եկամուտ",
     "recentOrders": "Վերջին պատվերներ",
@@ -552,7 +552,7 @@
     "completed": "Ավարտված",
     "cancelled": "Չեղարկված",
     "paid": "Վճարված",
-    "pendingPayment": "Վճարում սպասվում է",
+    "pendingPayment": "սպասվում է",
     "failed": "Ձախողված",
     "statusUpdated": "Կարգավիճակը հաջողությամբ թարմացվեց",
     "paymentStatusUpdated": "Վճարման կարգավիճակը հաջողությամբ թարմացվեց",
