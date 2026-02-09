@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Card, Button, Input } from '@shop/ui';
 import { apiClient } from '../../lib/api-client';
-import { formatPrice, getStoredCurrency } from '../../lib/currency';
+import { formatPrice, formatPriceInCurrency, getStoredCurrency, convertPrice } from '../../lib/currency';
 import { getStoredLanguage } from '../../lib/language';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { useTranslation } from '../../lib/i18n-client';
@@ -252,12 +252,19 @@ export default function CheckoutPage() {
       setLanguage(getStoredLanguage());
     };
 
+    // Listen for currency rates updates to force re-render (like ProductCard does)
+    const handleCurrencyRatesUpdate = () => {
+      setCurrency(getStoredCurrency());
+    };
+
     window.addEventListener('currency-updated', handleCurrencyUpdate);
     window.addEventListener('language-updated', handleLanguageUpdate);
+    window.addEventListener('currency-rates-updated', handleCurrencyRatesUpdate);
 
     return () => {
       window.removeEventListener('currency-updated', handleCurrencyUpdate);
       window.removeEventListener('language-updated', handleLanguageUpdate);
+      window.removeEventListener('currency-rates-updated', handleCurrencyRatesUpdate);
     };
   }, [isLoggedIn, isLoading, router]);
 
@@ -685,6 +692,52 @@ export default function CheckoutPage() {
     }
   }
 
+  // Calculate all values in AMD first, then convert to display currency
+  // Shipping is already in AMD, so we don't convert it
+  // This must be before early returns to follow Rules of Hooks
+  const orderSummary = useMemo(() => {
+    // Return default values if cart is not available
+    if (!cart || cart.items.length === 0) {
+      return {
+        subtotalAMD: 0,
+        taxAMD: 0,
+        shippingAMD: 0,
+        totalAMD: 0,
+        subtotalDisplay: 0,
+        taxDisplay: 0,
+        shippingDisplay: 0,
+        totalDisplay: 0,
+      };
+    }
+
+    // Cart totals are stored in USD, convert to AMD
+    const subtotalAMD = convertPrice(cart.totals.subtotal, 'USD', 'AMD');
+    const taxAMD = convertPrice(cart.totals.tax, 'USD', 'AMD');
+    
+    // Shipping is already in AMD, use as-is (no conversion)
+    const shippingAMD = shippingMethod === 'delivery' && deliveryPrice !== null ? deliveryPrice : 0;
+    
+    // Calculate total in AMD
+    const totalAMD = subtotalAMD + taxAMD + shippingAMD;
+    
+    // Convert AMD values to display currency
+    const subtotalDisplay = currency === 'AMD' ? subtotalAMD : convertPrice(subtotalAMD, 'AMD', currency);
+    const taxDisplay = currency === 'AMD' ? taxAMD : convertPrice(taxAMD, 'AMD', currency);
+    const shippingDisplay = currency === 'AMD' ? shippingAMD : convertPrice(shippingAMD, 'AMD', currency);
+    const totalDisplay = currency === 'AMD' ? totalAMD : convertPrice(totalAMD, 'AMD', currency);
+    
+    return {
+      subtotalAMD,
+      taxAMD,
+      shippingAMD,
+      totalAMD,
+      subtotalDisplay,
+      taxDisplay,
+      shippingDisplay,
+      totalDisplay,
+    };
+  }, [cart, shippingMethod, deliveryPrice, currency]);
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -931,7 +984,7 @@ export default function CheckoutPage() {
               <div className="space-y-4 mb-6">
                 <div className="flex justify-between text-gray-600">
                   <span>{t('checkout.summary.subtotal')}</span>
-                  <span>{formatPrice(cart.totals.subtotal, currency)}</span>
+                  <span>{formatPriceInCurrency(orderSummary.subtotalDisplay, currency)}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span>{t('checkout.summary.shipping')}</span>
@@ -941,24 +994,19 @@ export default function CheckoutPage() {
                       : loadingDeliveryPrice
                         ? t('checkout.shipping.loading')
                         : deliveryPrice !== null
-                          ? formatPrice(deliveryPrice, currency) + (shippingCity ? ` (${shippingCity})` : ` (${t('checkout.shipping.delivery')})`)
+                          ? formatPriceInCurrency(orderSummary.shippingDisplay, currency) + (shippingCity ? ` (${shippingCity})` : ` (${t('checkout.shipping.delivery')})`)
                           : t('checkout.shipping.enterCity')}
                   </span>
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span>{t('checkout.summary.tax')}</span>
-                  <span>{formatPrice(cart.totals.tax, currency)}</span>
+                  <span>{formatPriceInCurrency(orderSummary.taxDisplay, currency)}</span>
                 </div>
                 <div className="border-t border-gray-200 pt-4">
                   <div className="flex justify-between text-lg font-bold text-gray-900">
                     <span>{t('checkout.summary.total')}</span>
                     <span>
-                      {formatPrice(
-                        cart.totals.subtotal + 
-                        cart.totals.tax + 
-                        (shippingMethod === 'delivery' && deliveryPrice !== null ? deliveryPrice : 0),
-                        currency
-                      )}
+                      {formatPriceInCurrency(orderSummary.totalDisplay, currency)}
                     </span>
                   </div>
                 </div>
@@ -1173,7 +1221,7 @@ export default function CheckoutPage() {
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">{t('checkout.summary.subtotal')}:</span>
-                      <span className="font-medium">{formatPrice(cart.totals.subtotal, currency)}</span>
+                      <span className="font-medium">{formatPriceInCurrency(orderSummary.subtotalDisplay, currency)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">{t('checkout.summary.shipping')}:</span>
@@ -1181,7 +1229,7 @@ export default function CheckoutPage() {
                         {loadingDeliveryPrice
                           ? t('checkout.shipping.loading')
                           : deliveryPrice !== null
-                            ? formatPrice(deliveryPrice, currency) + (shippingCity ? ` (${shippingCity})` : ` (${t('checkout.shipping.delivery')})`)
+                            ? formatPriceInCurrency(orderSummary.shippingDisplay, currency) + (shippingCity ? ` (${shippingCity})` : ` (${t('checkout.shipping.delivery')})`)
                             : shippingMethod === 'delivery' ? t('checkout.shipping.enterCity') : t('checkout.shipping.freePickup')}
                       </span>
                     </div>
@@ -1189,12 +1237,7 @@ export default function CheckoutPage() {
                       <div className="flex justify-between">
                         <span className="font-semibold text-gray-900">{t('checkout.summary.total')}:</span>
                         <span className="font-bold text-gray-900">
-                          {formatPrice(
-                            cart.totals.subtotal + 
-                            cart.totals.tax + 
-                            (shippingMethod === 'delivery' && deliveryPrice !== null ? deliveryPrice : 0),
-                            currency
-                          )}
+                          {formatPriceInCurrency(orderSummary.totalDisplay, currency)}
                         </span>
                       </div>
                     </div>
@@ -1296,7 +1339,7 @@ export default function CheckoutPage() {
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">{t('checkout.summary.subtotal')}:</span>
-                      <span className="font-medium">{formatPrice(cart.totals.subtotal, currency)}</span>
+                      <span className="font-medium">{formatPriceInCurrency(orderSummary.subtotalDisplay, currency)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">{t('checkout.summary.shipping')}:</span>
@@ -1306,7 +1349,7 @@ export default function CheckoutPage() {
                       <div className="flex justify-between">
                         <span className="font-semibold text-gray-900">{t('checkout.summary.total')}:</span>
                         <span className="font-bold text-gray-900">
-                          {formatPrice(cart.totals.subtotal + cart.totals.tax, currency)}
+                          {formatPriceInCurrency(orderSummary.totalDisplay, currency)}
                         </span>
                       </div>
                     </div>
@@ -1500,7 +1543,7 @@ export default function CheckoutPage() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">{t('checkout.summary.subtotal')}:</span>
-                  <span className="font-medium">{formatPrice(cart.totals.subtotal, currency)}</span>
+                  <span className="font-medium">{formatPriceInCurrency(orderSummary.subtotalDisplay, currency)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">{t('checkout.summary.shipping')}:</span>
@@ -1510,24 +1553,19 @@ export default function CheckoutPage() {
                       : loadingDeliveryPrice
                         ? t('checkout.shipping.loading')
                         : deliveryPrice !== null
-                          ? formatPrice(deliveryPrice, currency) + (shippingCity ? ` (${shippingCity})` : ` (${t('checkout.shipping.delivery')})`)
+                          ? formatPriceInCurrency(orderSummary.shippingDisplay, currency) + (shippingCity ? ` (${shippingCity})` : ` (${t('checkout.shipping.delivery')})`)
                           : t('checkout.shipping.enterCity')}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">{t('checkout.summary.tax')}:</span>
-                  <span className="font-medium">{formatPrice(cart.totals.tax, currency)}</span>
+                  <span className="font-medium">{formatPriceInCurrency(orderSummary.taxDisplay, currency)}</span>
                 </div>
                 <div className="border-t border-gray-200 pt-2 mt-2">
                   <div className="flex justify-between">
                     <span className="font-semibold text-gray-900">{t('checkout.summary.total')}:</span>
                     <span className="font-bold text-gray-900">
-                      {formatPrice(
-                        cart.totals.subtotal + 
-                        cart.totals.tax + 
-                        (shippingMethod === 'delivery' && deliveryPrice !== null ? deliveryPrice : 0),
-                        currency
-                      )}
+                      {formatPriceInCurrency(orderSummary.totalDisplay, currency)}
                     </span>
                   </div>
                 </div>

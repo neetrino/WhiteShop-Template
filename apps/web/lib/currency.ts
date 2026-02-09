@@ -153,4 +153,25 @@ export function convertPrice(price: number, fromCurrency: CurrencyCode, toCurren
   return usdPrice * toRate;
 }
 
+/**
+ * Format price that is already in the target currency (no conversion)
+ * Use this for prices that are already in AMD (like shipping costs)
+ */
+export function formatPriceInCurrency(price: number, currency: CurrencyCode = 'AMD'): string {
+  const currencyInfo = CURRENCIES[currency];
+  
+  // Show all currencies without decimals (remove .00)
+  const minimumFractionDigits = 0;
+  const maximumFractionDigits = 0;
+  
+  const formatted = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currencyInfo.code,
+    minimumFractionDigits,
+    maximumFractionDigits,
+  }).format(price);
+  
+  return formatted;
+}
+
 
