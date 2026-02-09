@@ -22,6 +22,7 @@ class OrdersService {
         phone,
         shippingMethod = 'pickup',
         shippingAddress,
+        shippingAmount: providedShippingAmount,
         paymentMethod = 'idram',
       } = data;
 
@@ -278,7 +279,8 @@ class OrdersService {
       // Calculate totals
       const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
       const discountAmount = 0; // TODO: Implement discount/coupon logic
-      const shippingAmount = shippingMethod === 'delivery' ? 1000 : 0; // TODO: Calculate based on address
+      // Use provided shipping amount from frontend (calculated from delivery API), or 0 if not provided
+      const shippingAmount = providedShippingAmount !== undefined ? Number(providedShippingAmount) : 0;
       const taxAmount = 0; // TODO: Calculate tax if needed
       const total = subtotal - discountAmount + shippingAmount + taxAmount;
 

@@ -4852,6 +4852,7 @@ class AdminService {
 
   /**
    * Get delivery price for a specific city
+   * Returns the configured price if city has shipping, otherwise returns 0
    */
   async getDeliveryPrice(city: string, country: string = 'Armenia') {
     console.log('🚚 [ADMIN SERVICE] getDeliveryPrice called:', { city, country });
@@ -4861,8 +4862,8 @@ class AdminService {
     });
 
     if (!setting) {
-      console.log('✅ [ADMIN SERVICE] Delivery settings not found, returning default price');
-      return 1000; // Default price
+      console.log('✅ [ADMIN SERVICE] Delivery settings not found, returning 0 (no shipping for this city)');
+      return 0; // No shipping configured for this city
     }
 
     const value = setting.value as { locations?: Array<{ country: string; city: string; price: number }> };
@@ -4890,9 +4891,9 @@ class AdminService {
       return cityMatch.price;
     }
 
-    // Return default price if no match found
-    console.log('✅ [ADMIN SERVICE] No delivery price found, returning default');
-    return 1000; // Default price
+    // Return 0 if no match found (city doesn't have shipping configured)
+    console.log('✅ [ADMIN SERVICE] No delivery price found for city, returning 0');
+    return 0; // No shipping for this city
   }
 
   /**

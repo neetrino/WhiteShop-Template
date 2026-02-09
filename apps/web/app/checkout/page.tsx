@@ -217,8 +217,8 @@ export default function CheckoutPage() {
           setDeliveryPrice(response.price);
         } catch (err: any) {
           console.error('❌ [CHECKOUT] Error fetching delivery price:', err);
-          // Use default price if error
-          setDeliveryPrice(1000);
+          // Set to 0 if error (no default shipping cost)
+          setDeliveryPrice(0);
         } finally {
           setLoadingDeliveryPrice(false);
         }
@@ -623,6 +623,9 @@ export default function CheckoutPage() {
         isGuest: !isLoggedIn,
       });
 
+      // Calculate shipping amount: use deliveryPrice if delivery method, otherwise 0
+      const shippingAmount = data.shippingMethod === 'delivery' && deliveryPrice !== null ? deliveryPrice : 0;
+
       const response = await apiClient.post<{
         order: {
           id: string;
@@ -647,6 +650,7 @@ export default function CheckoutPage() {
         phone: data.phone,
         shippingMethod: data.shippingMethod,
         ...(shippingAddress ? { shippingAddress } : {}),
+        shippingAmount: shippingAmount,
         paymentMethod: data.paymentMethod,
       });
 

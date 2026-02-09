@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, Button } from '@shop/ui';
 import { apiClient } from '../../../lib/api-client';
-import { formatPrice, getStoredCurrency } from '../../../lib/currency';
+import { formatPrice, formatPriceInCurrency, getStoredCurrency, convertPrice } from '../../../lib/currency';
 import { useAuth } from '../../../lib/auth/AuthContext';
 import { useTranslation } from '../../../lib/i18n-client';
 
@@ -98,6 +98,8 @@ export default function OrderPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currency, setCurrency] = useState(getStoredCurrency());
+  const [calculatedShipping, setCalculatedShipping] = useState<number | null>(null);
+  const [loadingShipping, setLoadingShipping] = useState(false);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -133,11 +135,44 @@ export default function OrderPage() {
         })),
       });
       setOrder(response);
+      
+      // Calculate shipping based on city if delivery method
+      if (response.shippingMethod === 'delivery' && response.shippingAddress?.city) {
+        fetchShippingPrice(response.shippingAddress.city);
+      } else {
+        setCalculatedShipping(null);
+      }
     } catch (error: any) {
       console.error('Error fetching order:', error);
       setError(error.message || t('orders.notFound.description'));
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function fetchShippingPrice(city: string) {
+    if (!city || city.trim().length === 0) {
+      setCalculatedShipping(0);
+      return;
+    }
+
+    setLoadingShipping(true);
+    try {
+      console.log('🚚 [ORDER PAGE] Fetching delivery price for city:', city);
+      const response = await apiClient.get<{ price: number }>('/api/v1/delivery/price', {
+        params: {
+          city: city.trim(),
+          country: 'Armenia',
+        },
+      });
+      console.log('✅ [ORDER PAGE] Delivery price fetched:', response.price);
+      setCalculatedShipping(response.price);
+    } catch (err: any) {
+      console.error('❌ [ORDER PAGE] Error fetching delivery price:', err);
+      // Set to 0 if error (no shipping for this city)
+      setCalculatedShipping(0);
+    } finally {
+      setLoadingShipping(false);
     }
   }
 
@@ -371,7 +406,23 @@ export default function OrderPage() {
                   )}
                   <div className="flex justify-between text-gray-600">
                     <span>{t('orders.orderSummary.shipping')}</span>
-                    <span>{formatPrice(order.totals.shipping, currency)}</span>
+                    <span>
+                      {order.shippingMethod === 'pickup' 
+                        ? t('checkout.shipping.freePickup')
+                        : loadingShipping
+                          ? t('checkout.shipping.loading')
+                          : (() => {
+                              // Shipping is always stored in AMD, so we need to handle conversion properly
+                              const shippingAMD = calculatedShipping !== null ? calculatedShipping : order.totals.shipping;
+                              
+                              // Convert AMD to display currency if needed
+                              const shippingDisplay = currency === 'AMD' 
+                                ? shippingAMD 
+                                : convertPrice(shippingAMD, 'AMD', currency);
+                              
+                              return formatPriceInCurrency(shippingDisplay, currency) + (order.shippingAddress?.city ? ` (${order.shippingAddress.city})` : '');
+                            })()}
+                    </span>
                   </div>
                   <div className="flex justify-between text-gray-600">
                     <span>{t('orders.orderSummary.tax')}</span>
