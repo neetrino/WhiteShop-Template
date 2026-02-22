@@ -1,5 +1,5 @@
 import { apiClient } from '../../lib/api-client';
-import { Cart, CartItem } from './useCheckout';
+import type { Cart, CartItem } from './types';
 
 const CART_KEY = 'shop_cart_guest';
 

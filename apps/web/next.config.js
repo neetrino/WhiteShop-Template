@@ -6,9 +6,8 @@ const nextConfig = {
   transpilePackages: ['@shop/ui', '@shop/design-tokens'],
   // Standalone output - prevents prerendering of 404 page
   output: 'standalone',
-    typescript: {
-    ignoreBuildErrors: true, // TypeScript errors won't stop build
-  },     
+  // typescript.ignoreBuildErrors removed - build will fail on TypeScript errors
+  // This ensures type safety in production builds     
   images: {
     remotePatterns: [
       {

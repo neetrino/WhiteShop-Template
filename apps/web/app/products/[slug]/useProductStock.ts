@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import type { Product, ProductVariant } from './types';
-import type { AttributeGroupValue } from './types';
+import type { Product, ProductVariant, AttributeGroupValue } from './types';
 import type { LanguageCode } from '../../../lib/language';
 import { t } from '../../../lib/i18n';
 

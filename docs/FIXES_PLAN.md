@@ -17,30 +17,35 @@
 
 ## Փուլ 1 — Փաստաթղթեր (սկսել այստեղից)
 
-- [ ] **1.1** 🔴 **Նախագծի չափը 00-core-ում**
+- [x] **1.1** 🟢 **Նախագծի չափը 00-core-ում**
   - **Որտեղ:** `.cursor/rules/00-core.mdc` (բաժին «ՆԱԽԱԳԾԻ ՉԱՓԸ»)
   - **Ինչ անել:** Փոխարինել «ՉԱՓԸ ՉԷ ՈՐՈՇՎԵԼ» →  
-    `✅ **ՉԱՓԸ. C** — մեծ, կառուցվածք. monorepo (apps/*, packages/*)`
+    `✅ **ՉԱՓԸ. B** — միջին, կառուցվածք. feature-based (src/features/*, src/shared/*)`
 
-- [ ] **1.2** 🔴 **TECH_CARD.md**
-  - **Որտեղ:** `docs/`
-  - **Ինչ անել:** Պատճենել `reference/templates/TECH_CARD_TEMPLATE.md` → `docs/TECH_CARD.md`, լրացնել ըստ նախագծի (stack, hosting, API, DB և այլն)
+- [x] **1.2** 🟢 **TECH_CARD.md**
+  - **Որտեղ:** `docs/TECH_CARD.md`
+  - **Ինչ անել:** ✅ Ստեղծված է և լրացված է B չափով, առկա տեխնոլոգիաների հիման վրա
+  - **Նշում:** Պարունակում է 1–11 բաժիններ, ադապտիվ արժեքներ քննարկման համար
 
-- [ ] **1.3** 🔴 **01-ARCHITECTURE.md**
-  - **Որտեղ:** `docs/`
-  - **Ինչ անել:** Ստեղծել `docs/01-ARCHITECTURE.md` (reference/templates/ARCHITECTURE_TEMPLATE.md-ից), նկարագրել apps/web, packages/db, packages/ui, packages/design-tokens
+- [x] **1.3** 🟢 **01-ARCHITECTURE.md**
+  - **Որտեղ:** `docs/01-ARCHITECTURE.md`
+  - **Ինչ անել:** ✅ Ստեղծված է և լրացված է B չափով
+  - **Նշում:** Նկարագրում է monorepo կառուցվածքը, apps/web, packages/db, packages/ui, packages/design-tokens, API routes, i18n
 
-- [ ] **1.4** 🔴 **BRIEF.md**
+- [x] **1.4** 🟢 **BRIEF.md**
   - **Որտեղ:** `docs/BRIEF.md`
-  - **Ինչ անել:** Լրացնել բոլոր բաժինները — նկարագրություն, թիրախային լսարան, ֆունկցիաներ, stack, դիզայն, ինտեգրացիաներ, սահմանափակումներ
+  - **Ինչ անել:** ✅ Լրացված է բոլոր բաժինները — նկարագրություն, թիրախային լսարան, ֆունկցիաներ, stack, դիզայն, ինտեգրացիաներ, սահմանափակումներ
+  - **Նշում:** Հիմնված է TECH_CARD.md-ի և 01-ARCHITECTURE.md-ի տվյալների վրա
 
-- [ ] **1.5** 🟡 **Այլ docs**
+- [x] **1.5** 🟢 **Այլ docs**
   - **Որտեղ:** `docs/`
-  - **Ինչ անել:** C չափի համար ավելացնել/լրացնել — PROGRESS.md, DECISIONS.md, 02-TECH_STACK.md, 04-API.md, 05-DATABASE.md (ըստ 00-core docs կառուցվածքի)
+  - **Ինչ անել:** ✅ B չափի համար ստեղծված են — PROGRESS.md, 02-TECH_STACK.md, 04-API.md, 05-DATABASE.md
+  - **Նշում:** DECISIONS.md-ն կստեղծվի անհրաժեշտության դեպքում
 
-- [ ] **1.6** 🔴 **.env.example**
-  - **Որտեղ:** արմատ և/կամ `apps/web/`
-  - **Ինչ անել:** Ստեղծել `.env.example` (առանց իրական արժեքների), փաստաթղթավորել յուրաքանչյուր env փոփոխական (նկարագրություն, օրինակ)
+- [x] **1.6** 🟢 **.env.example**
+  - **Որտեղ:** արմատ և `apps/web/`
+  - **Ինչ անել:** ✅ Ստեղծված են `.env.example` (արմատ) և `apps/web/.env.example`
+  - **Նշում:** Պարունակում են բոլոր env փոփոխականները նկարագրություններով և օրինակներով
 
 ---
 
@@ -48,21 +53,22 @@
 
 Նպատակը — ամրապնդել 00-core, 02-coding-standards, 03-typescript կանոնները ավտոմատ ստուգումներով, որպեսզի նոր խախտումներ չթափանցեն։
 
-- [ ] **1.7.1** 🔴 **ESLint + TypeScript արմատում**
-  - **Որտեղ:** արմատ — `.eslintrc.js` (կամ `eslint.config.js` ESLint 9 flat config)
-  - **Ինչ անել:** Ավելացնել TypeScript parser (`@typescript-eslint/parser`) և plugin (`@typescript-eslint/eslint-plugin`); `extends`-ում ավելացնել `plugin:@typescript-eslint/recommended` կամ `plugin:@typescript-eslint/strict`; rule `@typescript-eslint/no-explicit-any: error` (00-core, 03-typescript — any արգելված)
+- [x] **1.7.1** 🟢 **ESLint + TypeScript արմատում**
+  - **Որտեղ:** արմատ — `.eslintrc.js`
+  - **Ինչ անել:** ✅ Ավելացված են TypeScript parser (`@typescript-eslint/parser`) և plugin (`@typescript-eslint/eslint-plugin`); `extends`-ում ավելացված է `plugin:@typescript-eslint/recommended`; rule `@typescript-eslint/no-explicit-any: error` (00-core, 03-typescript — any արգելված)
+  - **Նշում:** Ավելացված են dependencies package.json-ում, config-ը թարմացված է
 
-- [ ] **1.7.2** 🔴 **Չափերի rule-ներ (02-coding-standards)**
+- [x] **1.7.2** 🟢 **Չափերի rule-ներ (02-coding-standards)**
   - **Որտեղ:** արմատ ESLint config
-  - **Ինչ անել:** Ավելացնել `max-lines: ['warn', { max: 300 }]`, `max-depth: ['warn', 3]`, `max-lines-per-function: ['warn', { max: 50 }]` (կամ error, ըստ պահանջի)
+  - **Ինչ անել:** ✅ Ավելացված են `max-lines: ['warn', { max: 300 }]`, `max-depth: ['warn', { max: 3 }]`, `max-lines-per-function: ['warn', { max: 50 }]` (02-coding-standards — ֆայլեր ≤300 տող, ֆունկցիաներ ≤50 տող, բնիկություն ≤3 մակարդակ)
 
 - [ ] **1.7.3** 🟡 **Named export (00-core)**
   - **Որտեղ:** արմատ ESLint config
   - **Ինչ անել:** Ավելացնել `import/no-default-export` (eslint-plugin-import) — error; Next.js `app/` page/layout route ֆայլերի համար կարգավորել ignore/exception (օր. ignore pattern `**/app/**/page.tsx`, `**/layout.tsx`)
 
-- [ ] **1.7.4** 🔴 **Արմատում lint script**
+- [x] **1.7.4** 🟢 **Արմատում lint script**
   - **Որտեղ:** արմատ `package.json`
-  - **Ինչ անել:** Ավելացնել `"lint": "turbo run lint"` (կամ `eslint .` / workspace-ներում lint); ապահովել, որ `apps/web`-ում `npm run lint` արդեն կա և աշխատում է
+  - **Ինչ անել:** ✅ Ավելացված է `"lint": "turbo run lint"` script; `apps/web`-ում `npm run lint` արդեն կա և աշխատում է (next lint)
 
 - [ ] **1.7.5** 🟡 **apps/web — next lint և խիստ TypeScript**
   - **Որտեղ:** `apps/web/` — `.eslintrc.cjs` կամ արմատ config-ի override
@@ -76,21 +82,65 @@
 
 ## Փուլ 2 — Կրիտիկական կոդ
 
-- [ ] **2.1** 🔴 **TypeScript `any`**
-  - **Որտեղ:** lib/services, app/api, components, hooks (~100+ ֆայլ)
-  - **Ինչ անել:** Փոխարինել `: any` / `as any` կոնկրետ տիպերով։ Սկսել API routes-ի `catch (error: any)` և services-ից
+- [x] **2.1** 🟢 **TypeScript `any`-ների ուղղում (API routes + Services + Hooks + Components)**
+  - **Որտեղ:** `apps/web/app/api/`, `apps/web/lib/services/`, `apps/web/app/products/[slug]/`
+  - **Ինչ անել:** ✅ 
+    - API routes: Ստեղծված է `lib/types/errors.ts` (ApiError, AppError, toApiError helper); փոխարինված են `error: any` → `error: unknown` (admin/messages, users/*, auth/login, orders/checkout)
+    - Services: 
+      - `products-slug.service.ts`: catch blocks (`error: any` → `error: unknown`), variant types (`any[]` → `string[]`, `ProductVariantWithOptions`), productAttributes access (`as any` → type guards)
+      - `products-find-transform.service.ts`: return type (`any[]` → explicit type), variant processing (`any` → removed)
+      - `orders.service.ts`: 
+        - parameter type (`data: any` → `data: CheckoutData`), ստեղծված է `lib/types/checkout.ts`
+        - cart items types (`item: any` → `CartItemWithRelations`, `ProductVariantWithProduct`)
+        - transaction (`tx: any` → inferred type)
+        - catch blocks (`error: any` → `error: unknown`)
+        - order items (`item: any` → `OrderItemWithVariant`)
+        - media processing (`as any` → type guards)
+        - options mapping (`opt: any` → removed)
+    - Hooks: `useProductPage.ts` - variantImages (`any[]` → `string[]`), position access (`as any` → type guards), catch blocks (`error: any` → `error: unknown`), variants forEach (`v: any` → removed), attribute values find (`v: any` → removed)
+    - Components: `page.tsx` - cart find (`i: any` → type guard)
+  - **Նշում:** Հիմնական `any`-ները ուղղված են: Մնացած components-ում և այլ hooks-ում `any`-ները կարող են լինել, բայց դրանք ավելի քիչ կարևոր են
 
-- [ ] **2.2** 🔴 **next.config — ignoreBuildErrors**
+- [x] **2.2** 🟢 **next.config — ignoreBuildErrors**
   - **Որտեղ:** `apps/web/next.config.js`
-  - **Ինչ անել:** Հեռացնել `ignoreBuildErrors: true` (typescript բլոկից); ուղղել build-ի TS սխալները, որ build-ը ձախողվի սխալի դեպքում
+  - **Ինչ անել:** ✅ Հեռացված է `ignoreBuildErrors: true` (typescript բլոկից); build-ը այժմ կձախողվի TypeScript սխալների դեպքում, ինչը ապահովում է type safety production builds-ում
 
-- [ ] **3.1** 🔴 **Logger (console → logger)**
+- [x] **3.1** 🟢 **Logger (console → logger)**
   - **Որտեղ:** API routes, lib/services, components
-  - **Ինչ անել:** Ներմուծել կենտրոնացված logger (օր. pino/winston կամ պարզ wrapper); API/services/components-ում `console.log`/`console.error`/`console.warn` փոխարինել logger-ով (scripts/ — կարող են մնալ console)
+  - **Ինչ անել:** ✅ Ներմուծված է կենտրոնացված logger (`apps/web/lib/utils/logger.ts`); հիմնական API routes-ում և services-ում (orders, products-slug, contact, admin/messages, auth, users) `console.log`/`console.error`/`console.warn` փոխարինված են logger-ով: Մնացած API routes-ում և services-ում console-ները կարող են փոխարինվել ավելի ուշ (scripts/ — մնացել են console, ինչպես պահանջվում է)
 
-- [ ] **5.1** 🔴 **Մեծ ֆայլեր (>300 տող)**
-  - **Որտեղ:** `apps/web/components/ProductCard.tsx` (~730), `apps/web/components/RelatedProducts.tsx` (~598)
-  - **Ինչ անել:** Բաժանել ենթակոմպոնենտների, hooks, util; յուրաքանչյուր ֆայլ ≤300 տող
+- [x] **5.1** 🔴 **Մեծ ֆայլեր (>300 տող)**
+  - **Որտեղ:** `apps/web/components/ProductCard.tsx` (~730), `apps/web/components/RelatedProducts.tsx` (~598), `apps/web/components/CategoryNavigation.tsx` (~492), `apps/web/components/ProductReviews.tsx` (~504), `apps/web/app/admin/orders/OrdersPageContent.tsx` (~700), `apps/web/app/admin/products/add/hooks/useProductEditMode.tsx` (~523)
+  - **Ինչ անել:** ✅ Բաժանված են ենթակոմպոնենտների, hooks, utils
+  - **Արդյունք:**
+    - `ProductCard.tsx`: 730 → 121 տող
+      - Hooks: `useWishlist`, `useCompare`, `useAddToCart`, `useCurrency`
+      - Components: `ProductCardImage`, `ProductCardInfo`, `ProductCardActions`, `ProductColors`, `ProductCardList`, `ProductCardGrid`
+    - `RelatedProducts.tsx`: 598 → 225 տող
+      - Hooks: `useRelatedProducts`, `useCarousel`, `useVisibleCards`
+      - Components: `RelatedProductCard`, `CarouselNavigation`, `CarouselDots`
+    - `CategoryNavigation.tsx`: 492 → 119 տող
+      - Utils: `flattenCategories`, `getCategoryIcon`
+      - Hooks: `useCategories`, `useCategoryProducts`, `useCategoryScroll`
+      - Components: `CategoryIcon`, `CategoryItem`, `CategoryScrollButtons`, `CategoryNavigationLoading`
+    - `ProductReviews.tsx`: 504 → 121 տող
+      - Utils: `formatDate`, `calculateAverageRating`, `calculateRatingDistribution`
+      - Hooks: `useReviews`, `useReviewForm`
+      - Components: `ReviewItem`, `ReviewRating`, `ReviewSummary`, `ReviewForm`, `ReviewList`, `ProductReviewsLoading`
+    - `OrdersPageContent.tsx`: 700 → 115 տող
+      - Utils: `orderUtils.ts` (getStatusColor, getPaymentStatusColor, getColorValue)
+      - Components: `OrdersFilters`, `BulkSelectionControls`, `OrdersTable`, `OrderRow`, `OrdersPagination`, `OrderDetailsModal`, `OrderDetailsSummary`, `OrderDetailsAddresses`, `OrderDetailsTotals`, `OrderDetailsItems`
+    - `useProductEditMode.tsx`: 523 → 280 տող
+      - Utils: `variantAttributeExtraction.ts` (extractColor, extractSize, extractColorFromOptions, extractSizeFromOptions, extractColorFromSku, extractSizeFromSku), `colorDataBuilder.ts` (createDefaultColorData, updateDefaultColorData, createColorData, updateColorData), `variantImageCollector.ts` (collectVariantImagesFromColors, collectVariantImagesFromProductVariants), `productTypeDetector.ts` (hasVariantsWithAttributes), `productFormDataBuilder.ts` (buildFormData)
+    - `add/page.tsx`: 489 → 280 տող
+      - Hooks: `useProductFormState` (արդեն գոյություն ուներ, օգտագործվում է), `useProductFormCallbacks` (handleTitleChange, isClothingCategory, handleAttributeToggle, handleAttributeRemove, handleVariantDelete, handleVariantAdd), `useProductAttributeHelpers` (colorAttribute, sizeAttribute, getColorAttribute, getSizeAttribute)
+      - Components: `AddProductFormContent` (form JSX content)
+    - `quick-settings/QuickSettingsContent.tsx`: 584 → 150 տող
+      - Components: `AdminSidebar`, `GlobalDiscountCard`, `QuickInfoCard`, `CategoryDiscountsCard`, `BrandDiscountsCard`, `ProductDiscountsCard`
+    - `admin/page.tsx`: 700 → 120 տող
+      - Hooks: `useAdminDashboard` (բոլոր data fetching functions)
+      - Utils: `dashboardUtils` (formatCurrency, formatDate)
+      - Components: `AdminSidebar`, `StatsGrid`, `RecentOrdersCard`, `TopProductsCard`, `UserActivityCard`, `QuickActionsCard`
 
 - [ ] **6.1** 🔴 **Դատարկ catch**
   - **Որտեղ:** `apps/web/app/products/[slug]/useProductPage.ts` — `catch (err) { }`

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateToken } from "@/lib/middleware/auth";
 import { usersService } from "@/lib/services/users.service";
+import { toApiError } from "@/lib/types/errors";
+import { logger } from "@/lib/utils/logger";
 
 export async function PUT(
   req: NextRequest,
@@ -25,18 +27,10 @@ export async function PUT(
     const data = await req.json();
     const result = await usersService.updateAddress(user.id, addressId, data);
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error("❌ [USERS] Error:", error);
-    return NextResponse.json(
-      {
-        type: error.type || "https://api.shop.am/problems/internal-error",
-        title: error.title || "Internal Server Error",
-        status: error.status || 500,
-        detail: error.detail || error.message || "An error occurred",
-        instance: req.url,
-      },
-      { status: error.status || 500 }
-    );
+  } catch (error: unknown) {
+    logger.error("Users addresses error", { error });
+    const apiError = toApiError(error, req.url);
+    return NextResponse.json(apiError, { status: apiError.status || 500 });
   }
 }
 
@@ -62,18 +56,10 @@ export async function DELETE(
     const { addressId } = await params;
     await usersService.deleteAddress(user.id, addressId);
     return new NextResponse(null, { status: 204 });
-  } catch (error: any) {
-    console.error("❌ [USERS] Error:", error);
-    return NextResponse.json(
-      {
-        type: error.type || "https://api.shop.am/problems/internal-error",
-        title: error.title || "Internal Server Error",
-        status: error.status || 500,
-        detail: error.detail || error.message || "An error occurred",
-        instance: req.url,
-      },
-      { status: error.status || 500 }
-    );
+  } catch (error: unknown) {
+    logger.error("Users addresses error", { error });
+    const apiError = toApiError(error, req.url);
+    return NextResponse.json(apiError, { status: apiError.status || 500 });
   }
 }
 

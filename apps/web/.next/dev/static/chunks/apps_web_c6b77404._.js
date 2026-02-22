@@ -599,7 +599,7 @@ __turbopack_context__.s([
     ()=>useAttributes
 ]);
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/apps/web/lib/api-client.ts [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/apps/web/lib/api-client.ts [app-client] (ecmascript) <locals>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$i18n$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/apps/web/lib/i18n-client.ts [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$components$2f$Toast$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/apps/web/components/Toast.tsx [app-client] (ecmascript)");
 var _s = __turbopack_context__.k.signature();
@@ -640,7 +640,7 @@ function useAttributes() {
             try {
                 setLoading(true);
                 console.log('📋 [ADMIN] Fetching attributes...');
-                const response = await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiClient"].get('/api/v1/admin/attributes');
+                const response = await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["apiClient"].get('/api/v1/admin/attributes');
                 console.log('📋 [ADMIN] Attributes response:', response.data);
                 // Log colors for each value to debug
                 if (response.data && Array.isArray(response.data)) {
@@ -692,7 +692,7 @@ function useAttributes() {
         const autoKey = formData.name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
         try {
             console.log('🆕 [ADMIN] Creating attribute:', autoKey);
-            await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiClient"].post('/api/v1/admin/attributes', {
+            await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["apiClient"].post('/api/v1/admin/attributes', {
                 name: formData.name.trim(),
                 key: autoKey,
                 type: 'select',
@@ -718,7 +718,7 @@ function useAttributes() {
         }
         try {
             console.log(`🗑️ [ADMIN] Deleting attribute: ${attributeName} (${attributeId})`);
-            await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiClient"].delete(`/api/v1/admin/attributes/${attributeId}`);
+            await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["apiClient"].delete(`/api/v1/admin/attributes/${attributeId}`);
             console.log('✅ [ADMIN] Attribute deleted successfully');
             fetchAttributes();
             (0, __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$components$2f$Toast$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["showToast"])(t('admin.attributes.deletedSuccess'), 'success');
@@ -737,7 +737,7 @@ function useAttributes() {
         try {
             setSavingAttribute(true);
             console.log(`✏️ [ADMIN] Updating attribute name: ${attributeId} -> ${trimmedName}`);
-            await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiClient"].patch(`/api/v1/admin/attributes/${attributeId}/translations`, {
+            await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["apiClient"].patch(`/api/v1/admin/attributes/${attributeId}/translations`, {
                 name: trimmedName,
                 locale: 'en'
             });
@@ -795,7 +795,7 @@ function useAttributes() {
         try {
             setAddingValueTo(attributeId);
             console.log('➕ [ADMIN] Adding value to attribute:', attributeId, trimmedValue);
-            await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiClient"].post(`/api/v1/admin/attributes/${attributeId}/values`, {
+            await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["apiClient"].post(`/api/v1/admin/attributes/${attributeId}/values`, {
                 label: trimmedValue,
                 locale: 'en'
             });
@@ -827,7 +827,7 @@ function useAttributes() {
         try {
             setDeletingValue(valueId);
             console.log(`🗑️ [ADMIN] Deleting value: ${valueLabel} (${valueId})`);
-            await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiClient"].delete(`/api/v1/admin/attributes/${attributeId}/values/${valueId}`);
+            await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["apiClient"].delete(`/api/v1/admin/attributes/${attributeId}/values/${valueId}`);
             console.log('✅ [ADMIN] Value deleted successfully');
             fetchAttributes();
             setDeletingValue(null);
@@ -850,7 +850,7 @@ function useAttributes() {
                 colorsIsArray: Array.isArray(data.colors),
                 colorsLength: data.colors?.length
             });
-            await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiClient"].patch(`/api/v1/admin/attributes/${editingValue.attributeId}/values/${editingValue.value.id}`, {
+            await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["apiClient"].patch(`/api/v1/admin/attributes/${editingValue.attributeId}/values/${editingValue.value.id}`, {
                 ...data,
                 locale: 'en'
             });

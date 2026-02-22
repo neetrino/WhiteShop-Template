@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateToken } from "@/lib/middleware/auth";
 import { usersService } from "@/lib/services/users.service";
+import { toApiError } from "@/lib/types/errors";
+import { logger } from "@/lib/utils/logger";
 
 export async function PUT(req: NextRequest) {
   try {
@@ -66,27 +68,17 @@ export async function PUT(req: NextRequest) {
 
     const result = await usersService.changePassword(user.id, oldPassword.trim(), newPassword.trim());
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error("❌ [USERS] Password change error:", {
-      message: error?.message,
-      stack: error?.stack,
-      name: error?.name,
-      type: error?.type,
-      title: error?.title,
-      status: error?.status,
-      detail: error?.detail,
-      fullError: error,
-    });
-    return NextResponse.json(
-      {
-        type: error.type || "https://api.shop.am/problems/internal-error",
-        title: error.title || "Internal Server Error",
-        status: error.status || 500,
-        detail: error.detail || error.message || "An error occurred",
-        instance: req.url,
-      },
-      { status: error.status || 500 }
-    );
+  } catch (error: unknown) {
+    logger.error("Password change error", { error });
+    if (error instanceof Error) {
+      logger.error("Password change error details", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+      });
+    }
+    const apiError = toApiError(error, req.url);
+    return NextResponse.json(apiError, { status: apiError.status || 500 });
   }
 }
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@white-shop/db";
+import { logger } from "@/lib/utils/logger";
 
 /**
  * POST /api/v1/contact
@@ -88,7 +89,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    console.log("✅ [CONTACT] Message created:", contactMessage.id);
+    logger.info("Contact message created", { id: contactMessage.id });
 
     return NextResponse.json(
       {
@@ -103,14 +104,15 @@ export async function POST(req: NextRequest) {
       },
       { status: 201 }
     );
-  } catch (error: any) {
-    console.error("❌ [CONTACT] Error:", error);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error("Contact form error", { error });
     return NextResponse.json(
       {
         type: "https://api.shop.am/problems/internal-error",
         title: "Internal Server Error",
         status: 500,
-        detail: error.message || "An error occurred while submitting the contact form",
+        detail: errorMessage || "An error occurred while submitting the contact form",
         instance: req.url,
       },
       { status: 500 }

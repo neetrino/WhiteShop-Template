@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateToken, requireAdmin } from "@/lib/middleware/auth";
 import { db } from "@white-shop/db";
+import { toApiError } from "@/lib/types/errors";
+import { logger } from "@/lib/utils/logger";
 
 /**
  * GET /api/v1/admin/messages
@@ -29,13 +31,22 @@ export async function GET(req: NextRequest) {
 
     // Get total count
     let total: number;
-    let messages: any[];
+    let messages: Array<{
+      id: string;
+      name: string;
+      email: string;
+      subject: string;
+      message: string;
+      createdAt: Date;
+      updatedAt: Date;
+    }>;
     
     try {
       total = await db.contactMessage.count();
-    } catch (dbError: any) {
-      console.error("❌ [ADMIN MESSAGES] Database count error:", dbError);
-      throw new Error(`Database query failed: ${dbError.message || 'Unknown database error'}. Make sure Prisma Client is generated and migrations are applied.`);
+    } catch (dbError: unknown) {
+      logger.error("Database count error", { error: dbError });
+      const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown database error';
+      throw new Error(`Database query failed: ${errorMessage}. Make sure Prisma Client is generated and migrations are applied.`);
     }
 
     try {
@@ -47,9 +58,10 @@ export async function GET(req: NextRequest) {
           createdAt: 'desc',
         },
       });
-    } catch (dbError: any) {
-      console.error("❌ [ADMIN MESSAGES] Database findMany error:", dbError);
-      throw new Error(`Database query failed: ${dbError.message || 'Unknown database error'}. Make sure Prisma Client is generated and migrations are applied.`);
+    } catch (dbError: unknown) {
+      logger.error("Database findMany error", { error: dbError });
+      const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown database error';
+      throw new Error(`Database query failed: ${errorMessage}. Make sure Prisma Client is generated and migrations are applied.`);
     }
 
     const totalPages = Math.ceil(total / limit);
@@ -63,19 +75,13 @@ export async function GET(req: NextRequest) {
         totalPages,
       },
     });
-  } catch (error: any) {
-    console.error("❌ [ADMIN MESSAGES] Error:", error);
-    console.error("❌ [ADMIN MESSAGES] Error stack:", error.stack);
-    return NextResponse.json(
-      {
-        type: error.type || "https://api.shop.am/problems/internal-error",
-        title: error.title || "Internal Server Error",
-        status: error.status || 500,
-        detail: error.detail || error.message || "An error occurred",
-        instance: req.url,
-      },
-      { status: error.status || 500 }
-    );
+  } catch (error: unknown) {
+    logger.error("Admin messages error", { error });
+    if (error instanceof Error) {
+      logger.error("Admin messages error stack", { stack: error.stack });
+    }
+    const apiError = toApiError(error, req.url);
+    return NextResponse.json(apiError, { status: apiError.status || 500 });
   }
 }
 
@@ -124,25 +130,17 @@ export async function DELETE(req: NextRequest) {
       },
     });
 
-    console.log(`✅ [ADMIN MESSAGES] Deleted ${result.count} messages`);
+    logger.info('Deleted messages', { count: result.count });
 
     return NextResponse.json({
       data: {
         deletedCount: result.count,
       },
     });
-  } catch (error: any) {
-    console.error("❌ [ADMIN MESSAGES] Error:", error);
-    return NextResponse.json(
-      {
-        type: error.type || "https://api.shop.am/problems/internal-error",
-        title: error.title || "Internal Server Error",
-        status: error.status || 500,
-        detail: error.detail || error.message || "An error occurred",
-        instance: req.url,
-      },
-      { status: error.status || 500 }
-    );
+  } catch (error: unknown) {
+    logger.error("Admin messages delete error", { error });
+    const apiError = toApiError(error, req.url);
+    return NextResponse.json(apiError, { status: apiError.status || 500 });
   }
 }
 

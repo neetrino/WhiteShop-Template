@@ -26,3 +26,8 @@ foreach ($file in $envFiles) {
 
 Write-Host "Done!"
 
+
+
+
+
+

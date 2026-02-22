@@ -1,4 +1,56 @@
 import { db } from "@white-shop/db";
+import { Prisma } from "@prisma/client";
+import type { CheckoutData } from "../types/checkout";
+import { logger } from "../utils/logger";
+
+// Types for cart items with relations
+type CartItemWithRelations = Prisma.CartItemGetPayload<{
+  include: {
+    product: {
+      include: {
+        translations: true;
+      };
+    };
+    variant: {
+      include: {
+        options: true;
+      };
+    };
+  };
+}>;
+
+type ProductVariantWithProduct = Prisma.ProductVariantGetPayload<{
+  include: {
+    product: {
+      include: {
+        translations: true;
+      };
+    };
+    options: true;
+  };
+}>;
+
+type OrderItemWithVariant = Prisma.OrderItemGetPayload<{
+  include: {
+    variant: {
+      include: {
+        options: {
+          include: {
+            attributeValue: {
+              include: {
+                translations: true;
+                attribute: true;
+              };
+            };
+          };
+        };
+      };
+    };
+  };
+}>;
+
+// Media type helper
+type MediaItem = string | { url?: string; src?: string } | unknown;
 
 function generateOrderNumber(): string {
   const now = new Date();
@@ -13,7 +65,7 @@ class OrdersService {
   /**
    * Create order (checkout)
    */
-  async checkout(data: any, userId?: string) {
+  async checkout(data: CheckoutData, userId?: string) {
     try {
       const {
         cartId,
@@ -85,29 +137,15 @@ class OrdersService {
         }
 
         // Format cart items
-        console.log('🛒 [ORDERS SERVICE] Processing cart items:', cart.items.map((item: any) => ({
-          itemId: item.id,
-          variantId: item.variantId,
-          productId: item.productId,
-          quantity: item.quantity,
-          hasVariant: !!item.variant,
-        })));
+        logger.debug('Processing cart items', { count: cart.items.length });
         
         cartItems = await Promise.all(
-          cart.items.map(async (item: {
-            id: string;
-            productId: string;
-            variantId: string;
-            quantity: number;
-            priceSnapshot: number;
-            product: any;
-            variant: any;
-          }) => {
+          cart.items.map(async (item: CartItemWithRelations) => {
             const product = item.product;
             const variant = item.variant;
             
             if (!variant) {
-              console.error('❌ [ORDERS SERVICE] Cart item missing variant:', {
+              logger.error('Cart item missing variant', {
                 itemId: item.id,
                 variantId: item.variantId,
                 productId: item.productId,
@@ -120,7 +158,7 @@ class OrdersService {
               };
             }
             
-            console.log('✅ [ORDERS SERVICE] Processing cart item:', {
+            logger.debug('Processing cart item', {
               itemId: item.id,
               variantId: variant.id,
               productId: product.id,
@@ -133,19 +171,19 @@ class OrdersService {
 
             // Get variant title from options
             const variantTitle = variant.options
-              ?.map((opt: any) => `${opt.attributeKey}: ${opt.value}`)
+              ?.map((opt) => `${opt.attributeKey || ''}: ${opt.value || ''}`)
               .join(', ') || undefined;
 
             // Get image URL
             let imageUrl: string | undefined;
             if (product.media && Array.isArray(product.media) && product.media.length > 0) {
-              const firstMedia = product.media[0];
+              const firstMedia = product.media[0] as MediaItem;
               if (typeof firstMedia === "string") {
                 imageUrl = firstMedia;
-              } else if ((firstMedia as any)?.url) {
-                imageUrl = (firstMedia as any).url;
-              } else if ((firstMedia as any)?.src) {
-                imageUrl = (firstMedia as any).src;
+              } else if (firstMedia && typeof firstMedia === 'object' && 'url' in firstMedia && typeof firstMedia.url === 'string') {
+                imageUrl = firstMedia.url;
+              } else if (firstMedia && typeof firstMedia === 'object' && 'src' in firstMedia && typeof firstMedia.src === 'string') {
+                imageUrl = firstMedia.src;
               }
             }
 
@@ -170,7 +208,7 @@ class OrdersService {
               imageUrl,
             };
             
-            console.log('✅ [ORDERS SERVICE] Cart item formatted:', {
+            logger.debug('Cart item formatted', {
               variantId: cartItem.variantId,
               productId: cartItem.productId,
               quantity: cartItem.quantity,
@@ -181,11 +219,11 @@ class OrdersService {
           })
         );
         
-        console.log('✅ [ORDERS SERVICE] All cart items processed:', cartItems.length);
+        logger.info('All cart items processed', { count: cartItems.length });
       } else if (guestItems && Array.isArray(guestItems) && guestItems.length > 0) {
         // Get items from guest checkout
         cartItems = await Promise.all(
-          guestItems.map(async (item: any) => {
+          guestItems.map(async (item: { productId: string; variantId: string; quantity: number }) => {
             const { productId, variantId, quantity } = item;
 
             if (!productId || !variantId || !quantity) {
@@ -231,19 +269,19 @@ class OrdersService {
 
             const translation = variant.product.translations?.[0] || variant.product.translations?.[0];
             const variantTitle = variant.options
-              ?.map((opt: any) => `${opt.attributeKey}: ${opt.value}`)
+              ?.map((opt: { attributeKey?: string | null; value?: string | null }) => `${opt.attributeKey || ''}: ${opt.value || ''}`)
               .join(', ') || undefined;
 
             // Get image URL
             let imageUrl: string | undefined;
             if (variant.product.media && Array.isArray(variant.product.media) && variant.product.media.length > 0) {
-              const firstMedia = variant.product.media[0];
+              const firstMedia = variant.product.media[0] as MediaItem;
               if (typeof firstMedia === "string") {
                 imageUrl = firstMedia;
-              } else if ((firstMedia as any)?.url) {
-                imageUrl = (firstMedia as any).url;
-              } else if ((firstMedia as any)?.src) {
-                imageUrl = (firstMedia as any).src;
+              } else if (firstMedia && typeof firstMedia === 'object' && 'url' in firstMedia && typeof firstMedia.url === 'string') {
+                imageUrl = firstMedia.url;
+              } else if (firstMedia && typeof firstMedia === 'object' && 'src' in firstMedia && typeof firstMedia.src === 'string') {
+                imageUrl = firstMedia.src;
               }
             }
 
@@ -289,7 +327,7 @@ class OrdersService {
       const orderNumber = generateOrderNumber();
 
       // Create order with items in a transaction
-      const order = await db.$transaction(async (tx: any) => {
+      const order = await db.$transaction(async (tx: Prisma.TransactionClient) => {
         // Create order
         const newOrder = await tx.order.create({
           data: {
@@ -339,16 +377,12 @@ class OrdersService {
         });
 
         // Update stock for all variants
-        console.log('📦 [ORDERS SERVICE] Updating stock for variants:', cartItems.map(item => ({
-          variantId: item.variantId,
-          quantity: item.quantity,
-          sku: item.sku,
-        })));
+        logger.debug('Updating stock for variants', { count: cartItems.length });
         
         try {
           for (const item of cartItems) {
             if (!item.variantId) {
-              console.error('❌ [ORDERS SERVICE] Missing variantId for item:', item);
+              logger.error('Missing variantId for item', { item });
               throw {
                 status: 400,
                 type: "https://api.shop.am/problems/validation-error",
@@ -364,7 +398,7 @@ class OrdersService {
             });
 
             if (!variantBefore) {
-              console.error('❌ [ORDERS SERVICE] Variant not found:', item.variantId);
+              logger.error('Variant not found', { variantId: item.variantId });
               throw {
                 status: 404,
                 type: "https://api.shop.am/problems/not-found",
@@ -373,7 +407,9 @@ class OrdersService {
               };
             }
 
-            console.log(`📦 [ORDERS SERVICE] Updating stock for variant ${item.variantId} (SKU: ${variantBefore.sku}):`, {
+            logger.debug('Updating stock for variant', {
+              variantId: item.variantId,
+              sku: variantBefore.sku,
               currentStock: variantBefore.stock,
               quantityToDecrement: item.quantity,
               newStock: variantBefore.stock - item.quantity,
@@ -390,7 +426,9 @@ class OrdersService {
               select: { stock: true, sku: true },
             });
 
-            console.log(`✅ [ORDERS SERVICE] Stock updated for variant ${item.variantId} (SKU: ${updatedVariant.sku}):`, {
+            logger.debug('Stock updated for variant', {
+              variantId: item.variantId,
+              sku: updatedVariant.sku,
               newStock: updatedVariant.stock,
               expectedStock: variantBefore.stock - item.quantity,
               match: updatedVariant.stock === (variantBefore.stock - item.quantity),
@@ -398,7 +436,7 @@ class OrdersService {
 
             // Verify stock was actually decremented
             if (updatedVariant.stock !== (variantBefore.stock - item.quantity)) {
-              console.error('❌ [ORDERS SERVICE] Stock update mismatch!', {
+              logger.error('Stock update mismatch', {
                 variantId: item.variantId,
                 expectedStock: variantBefore.stock - item.quantity,
                 actualStock: updatedVariant.stock,
@@ -408,12 +446,13 @@ class OrdersService {
             }
           }
           
-          console.log('✅ [ORDERS SERVICE] All variant stocks updated successfully');
-        } catch (stockError: any) {
-          console.error('❌ [ORDERS SERVICE] Error updating stock:', {
+          logger.info('All variant stocks updated successfully');
+        } catch (stockError: unknown) {
+          const error = stockError as { message?: string; detail?: string };
+          logger.error('Error updating stock', {
             error: stockError,
-            message: stockError?.message,
-            detail: stockError?.detail,
+            message: error?.message,
+            detail: error?.detail,
           });
           // Re-throw to rollback transaction
           throw stockError;
@@ -460,25 +499,28 @@ class OrdersService {
           ? 'redirect_to_payment' 
           : 'view_order',
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      // Type guard for custom error
+      const customError = error as { status?: number; type?: string; message?: string; code?: string; name?: string; meta?: unknown; stack?: string };
+      
       // If it's already our custom error, re-throw it
-      if (error.status && error.type) {
+      if (customError.status && customError.type) {
         throw error;
       }
 
       // Log unexpected errors
-      console.error("❌ [ORDERS SERVICE] Checkout error:", {
+      logger.error("Checkout error", {
         error: {
-          name: error?.name,
-          message: error?.message,
-          code: error?.code,
-          meta: error?.meta,
-          stack: error?.stack?.substring(0, 500),
+          name: customError?.name,
+          message: customError?.message,
+          code: customError?.code,
+          meta: customError?.meta,
+          stack: customError?.stack?.substring(0, 500),
         },
       });
 
       // Handle Prisma errors
-      if (error?.code === 'P2002') {
+      if (customError?.code === 'P2002') {
         throw {
           status: 409,
           type: "https://api.shop.am/problems/conflict",
@@ -492,7 +534,7 @@ class OrdersService {
         status: 500,
         type: "https://api.shop.am/problems/internal-error",
         title: "Internal Server Error",
-        detail: error?.message || "An error occurred during checkout",
+        detail: customError?.message || "An error occurred during checkout",
       };
     }
   }
@@ -596,10 +638,10 @@ class OrdersService {
     }
 
     // Debug logging
-    console.log('📦 [ORDERS SERVICE] Order found:', {
+    logger.info('Order found', {
       orderNumber: order.number,
       itemsCount: order.items.length,
-      items: order.items.map((item: any) => ({
+      items: order.items.map((item: OrderItemWithVariant) => ({
         variantId: item.variantId,
         productTitle: item.productTitle,
         variant: item.variant ? {
@@ -616,54 +658,10 @@ class OrdersService {
       status: order.status,
       paymentStatus: order.paymentStatus,
       fulfillmentStatus: order.fulfillmentStatus,
-      items: order.items.map((item: {
-        variantId: string | null;
-        productTitle: string;
-        variantTitle: string | null;
-        sku: string;
-        quantity: number;
-        price: number;
-        total: number;
-        imageUrl: string | null;
-        variant: {
-          options: Array<{
-            attributeKey: string | null;
-            value: string | null;
-            valueId: string | null;
-            attributeValue: {
-              value: string;
-              imageUrl: string | null;
-              colors: any;
-              translations: Array<{
-                locale: string;
-                label: string;
-              }>;
-              attribute: {
-                key: string;
-              };
-            } | null;
-          }>;
-        } | null;
-      }) => {
-        const variantOptions = item.variant?.options?.map((opt: {
-          attributeKey: string | null;
-          value: string | null;
-          valueId: string | null;
-          attributeValue: {
-            value: string;
-            imageUrl: string | null;
-            colors: any;
-            translations: Array<{
-              locale: string;
-              label: string;
-            }>;
-            attribute: {
-              key: string;
-            };
-          } | null;
-        }) => {
+      items: order.items.map((item: OrderItemWithVariant) => {
+        const variantOptions = item.variant?.options?.map((opt) => {
           // Debug logging for each option
-          console.log(`🔍 [ORDERS SERVICE] Processing option:`, {
+          logger.debug('Processing option', {
             attributeKey: opt.attributeKey,
             value: opt.value,
             valueId: opt.valueId,
@@ -697,7 +695,7 @@ class OrdersService {
           };
         }) || [];
 
-        console.log(`🔍 [ORDERS SERVICE] Item mapping:`, {
+        logger.debug('Item mapping', {
           productTitle: item.productTitle,
           variantId: item.variantId,
           hasVariant: !!item.variant,
