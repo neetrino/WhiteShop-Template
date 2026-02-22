@@ -1,20 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import type { FormEvent } from 'react';
 import { Button } from '@shop/ui';
 import { useAuth } from '../lib/auth/AuthContext';
 import { useTranslation } from '../lib/i18n-client';
-import { apiClient } from '../lib/api-client';
-
-interface Review {
-  id: string;
-  userId: string;
-  userName: string;
-  rating: number;
-  comment: string;
-  createdAt: string;
-}
+import { useReviews } from './ProductReviews/hooks/useReviews';
+import { useReviewForm } from './ProductReviews/hooks/useReviewForm';
+import { ReviewSummary } from './ProductReviews/ReviewSummary';
+import { ReviewForm } from './ProductReviews/ReviewForm';
+import { ReviewList } from './ProductReviews/ReviewList';
+import { ProductReviewsLoading } from './ProductReviews/ProductReviewsLoading';
 
 interface ProductReviewsProps {
   productId?: string; // For backward compatibility
@@ -24,251 +18,49 @@ interface ProductReviewsProps {
 export function ProductReviews({ productId, productSlug }: ProductReviewsProps) {
   const { isLoggedIn, user } = useAuth();
   const { t } = useTranslation();
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [rating, setRating] = useState(0);
-  const [hoveredRating, setHoveredRating] = useState(0);
-  const [comment, setComment] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
-
-  useEffect(() => {
-    loadReviews();
-  }, [productId, productSlug]);
-
-  const loadReviews = async () => {
-    try {
-      // Use slug if available, otherwise fall back to productId
-      const identifier = productSlug || productId;
-      if (!identifier) {
-        console.warn('⚠️ [PRODUCT REVIEWS] No product identifier provided');
-        setReviews([]);
-        setLoading(false);
-        return;
-      }
-
-      console.log('📝 [PRODUCT REVIEWS] Loading reviews for product:', identifier);
-      setLoading(true);
-      const data = await apiClient.get<Review[]>(`/api/v1/products/${identifier}/reviews`);
-      console.log('✅ [PRODUCT REVIEWS] Reviews loaded:', data?.length || 0);
-      setReviews(data || []);
-    } catch (error: any) {
-      console.error('❌ [PRODUCT REVIEWS] Error loading reviews:', error);
-      // If 404, product might not have reviews yet - that's okay
-      if (error.status !== 404) {
-        console.error('Failed to load reviews:', error);
-      }
-      setReviews([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    
-    if (!isLoggedIn) {
-      alert(t('common.reviews.loginRequired'));
-      return;
-    }
-
-    if (rating === 0) {
-      alert(t('common.reviews.ratingRequired'));
-      return;
-    }
-
-    if (!comment.trim()) {
-      alert(t('common.reviews.commentRequired'));
-      return;
-    }
-
-    setSubmitting(true);
-
-    try {
-      // Use slug if available, otherwise fall back to productId
-      const identifier = productSlug || productId;
-      if (!identifier) {
-        alert(t('common.reviews.submitError'));
-        return;
-      }
-
-      console.log('📝 [PRODUCT REVIEWS] Submitting review:', { identifier, rating, commentLength: comment.length });
-      
-      const newReview = await apiClient.post<Review>(`/api/v1/products/${identifier}/reviews`, {
-        rating,
-        comment: comment.trim(),
-      });
-
-      console.log('✅ [PRODUCT REVIEWS] Review submitted successfully:', newReview.id);
-
-      // Add new review to the list
-      setReviews([newReview, ...reviews]);
-      setRating(0);
-      setComment('');
-      setShowForm(false);
-      
-      // Dispatch event to update rating on product page
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new Event('review-updated'));
-      }
-    } catch (error: any) {
-      console.error('❌ [PRODUCT REVIEWS] Error submitting review:', error);
-      
-      // Handle specific error cases
-      if (error.status === 409) {
-        // User already has a review - load it and show in edit mode
-        try {
-          const identifier = productSlug || productId;
-          if (!identifier) {
-            alert(t('common.reviews.alreadyReviewed') || 'You have already reviewed this product');
-            return;
-          }
-
-          console.log('📝 [PRODUCT REVIEWS] Loading existing review for user');
-          const existingReview = await apiClient.get<Review>(`/api/v1/products/${identifier}/reviews?my=true`);
-          
-          if (existingReview) {
-            // Add to reviews list if not already there
-            const reviewExists = reviews.some(r => r.id === existingReview.id);
-            if (!reviewExists) {
-              setReviews([existingReview, ...reviews]);
-            }
-            
-            // Show in edit mode
-            handleEditReview(existingReview);
-            alert(t('common.reviews.alreadyReviewed') || 'You have already reviewed this product. You can update your review below.');
-          } else {
-            alert(t('common.reviews.alreadyReviewed') || 'You have already reviewed this product');
-          }
-        } catch (loadError: any) {
-          console.error('❌ [PRODUCT REVIEWS] Error loading existing review:', loadError);
-          // Fallback to checking local reviews
-          if (userReview) {
-            handleEditReview(userReview);
-            alert(t('common.reviews.alreadyReviewed') || 'You have already reviewed this product. You can update your review below.');
-          } else {
-            alert(t('common.reviews.alreadyReviewed') || 'You have already reviewed this product');
-          }
-        }
-      } else if (error.status === 401) {
-        alert(t('common.reviews.loginRequired'));
-      } else {
-        alert(t('common.reviews.submitError'));
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const averageRating = reviews.length > 0
-    ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
-    : 0;
-
-  const ratingDistribution = [5, 4, 3, 2, 1].map((star) => ({
-    star,
-    count: reviews.filter((r) => r.rating === star).length,
-    percentage: reviews.length > 0
-      ? (reviews.filter((r) => r.rating === star).length / reviews.length) * 100
-      : 0,
-  }));
+  
+  const { reviews, loading, setReviews } = useReviews(productId, productSlug);
+  
+  const {
+    showForm,
+    setShowForm,
+    rating,
+    setRating,
+    hoveredRating,
+    setHoveredRating,
+    comment,
+    setComment,
+    submitting,
+    editingReviewId,
+    handleEditReview,
+    handleCancelEdit,
+    handleSubmit,
+    handleUpdateReview,
+  } = useReviewForm({
+    productId,
+    productSlug,
+    reviews,
+    setReviews,
+  });
 
   // Get user's review if exists
   const userReview = user ? reviews.find(r => r.userId === user.id) : null;
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    // Use browser's default locale for date formatting
-    return date.toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
+  if (loading) {
+    return <ProductReviewsLoading />;
+  }
 
-  const handleEditReview = (review: Review) => {
-    setEditingReviewId(review.id);
-    setRating(review.rating);
-    setComment(review.comment || '');
+  const handleShowForm = () => {
+    if (!isLoggedIn) {
+      alert(t('common.reviews.loginRequired'));
+      return;
+    }
     setShowForm(true);
   };
 
-  const handleCancelEdit = () => {
-    setEditingReviewId(null);
-    setRating(0);
-    setComment('');
-    setShowForm(false);
+  const handleLoginRequired = () => {
+    alert(t('common.reviews.loginRequired'));
   };
-
-  const handleUpdateReview = async (e: FormEvent) => {
-    e.preventDefault();
-    
-    if (!isLoggedIn || !editingReviewId) {
-      return;
-    }
-
-    if (rating === 0) {
-      alert(t('common.reviews.ratingRequired'));
-      return;
-    }
-
-    if (!comment.trim()) {
-      alert(t('common.reviews.commentRequired'));
-      return;
-    }
-
-    setSubmitting(true);
-
-    try {
-      console.log('📝 [PRODUCT REVIEWS] Updating review:', { reviewId: editingReviewId, rating, commentLength: comment.length });
-      
-      const updatedReview = await apiClient.put<Review>(`/api/v1/reviews/${editingReviewId}`, {
-        rating,
-        comment: comment.trim(),
-      });
-
-      console.log('✅ [PRODUCT REVIEWS] Review updated successfully:', updatedReview.id);
-
-      // Update review in the list
-      setReviews(reviews.map(r => r.id === editingReviewId ? updatedReview : r));
-      setRating(0);
-      setComment('');
-      setEditingReviewId(null);
-      setShowForm(false);
-      
-      // Dispatch event to update rating on product page
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new Event('review-updated'));
-      }
-    } catch (error: any) {
-      console.error('❌ [PRODUCT REVIEWS] Error updating review:', error);
-      
-      // Handle specific error cases
-      if (error.status === 401) {
-        alert(t('common.reviews.loginRequired'));
-      } else if (error.status === 403) {
-        alert('You can only update your own reviews');
-      } else {
-        alert(t('common.reviews.submitError'));
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-8"></div>
-          <div className="space-y-4">
-            <div className="h-24 bg-gray-200 rounded"></div>
-            <div className="h-24 bg-gray-200 rounded"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 border-t border-gray-200">
@@ -278,67 +70,13 @@ export function ProductReviews({ productId, productSlug }: ProductReviewsProps) 
         </h2>
 
         {/* Rating Summary */}
-        <div className="flex flex-col md:flex-row gap-8 mb-8">
-          <div className="flex flex-col items-center md:items-start">
-            <div className="text-5xl font-bold text-gray-900 mb-2">
-              {averageRating.toFixed(1)}
-            </div>
-            <div className="flex items-center gap-1 mb-2">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <svg
-                  key={star}
-                  className={`w-6 h-6 ${
-                    star <= Math.round(averageRating)
-                      ? 'text-yellow-400'
-                      : 'text-gray-300'
-                  }`}
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                </svg>
-              ))}
-            </div>
-            <div className="text-sm text-gray-600">
-              {reviews.length} {reviews.length === 1 
-                ? t('common.reviews.review')
-                : t('common.reviews.reviews')}
-            </div>
-          </div>
-
-          {/* Rating Distribution */}
-          <div className="flex-1">
-            {ratingDistribution.map(({ star, count, percentage }) => (
-              <div key={star} className="flex items-center gap-3 mb-2">
-                <div className="flex items-center gap-1 w-20">
-                  <span className="text-sm text-gray-600 w-4">{star}</span>
-                  <svg className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  </svg>
-                </div>
-                <div className="flex-1 bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-yellow-400 h-2 rounded-full"
-                    style={{ width: `${percentage}%` }}
-                  />
-                </div>
-                <span className="text-sm text-gray-600 w-12 text-right">{count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <ReviewSummary reviews={reviews} />
 
         {/* Write Review Button */}
         {!showForm && (
           <Button
             variant="primary"
-            onClick={() => {
-              if (!isLoggedIn) {
-                alert(t('common.reviews.loginRequired'));
-                return;
-              }
-              setShowForm(true);
-            }}
+            onClick={handleShowForm}
             className="mb-8"
           >
             {t('common.reviews.writeReview')}
@@ -347,155 +85,34 @@ export function ProductReviews({ productId, productSlug }: ProductReviewsProps) 
 
         {/* Review Form */}
         {showForm && (
-          <form onSubmit={editingReviewId ? handleUpdateReview : handleSubmit} className="mb-8 p-6 bg-gray-50 rounded-lg">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">
-              {editingReviewId ? 'Update Your Review' : t('common.reviews.writeReview')}
-            </h3>
-
-            {/* Rating Selector */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {t('common.reviews.rating')} *
-              </label>
-              <div className="flex items-center gap-2">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    type="button"
-                    onClick={() => setRating(star)}
-                    onMouseEnter={() => setHoveredRating(star)}
-                    onMouseLeave={() => setHoveredRating(0)}
-                    className="focus:outline-none"
-                  >
-                    <svg
-                      className={`w-8 h-8 transition-colors ${
-                        star <= (hoveredRating || rating)
-                          ? 'text-yellow-400'
-                          : 'text-gray-300'
-                      }`}
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Comment Textarea */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {t('common.reviews.comment')} *
-              </label>
-              <textarea
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                rows={5}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                placeholder={t('common.reviews.commentPlaceholder')}
-                required
-              />
-            </div>
-
-            {/* Form Actions */}
-            <div className="flex gap-4">
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={submitting}
-              >
-                {submitting
-                  ? t('common.reviews.submitting')
-                  : editingReviewId
-                    ? 'Update Review'
-                    : t('common.reviews.submitReview')}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={editingReviewId ? handleCancelEdit : () => {
-                  setShowForm(false);
-                  setRating(0);
-                  setComment('');
-                }}
-              >
-                {t('common.buttons.cancel')}
-              </Button>
-            </div>
-          </form>
+          <ReviewForm
+            rating={rating}
+            hoveredRating={hoveredRating}
+            comment={comment}
+            submitting={submitting}
+            editingReviewId={editingReviewId}
+            onRatingChange={setRating}
+            onHover={setHoveredRating}
+            onCommentChange={setComment}
+            onSubmit={editingReviewId ? handleUpdateReview : handleSubmit}
+            onCancel={editingReviewId ? handleCancelEdit : () => {
+              setShowForm(false);
+              setRating(0);
+              setComment('');
+            }}
+          />
         )}
       </div>
 
       {/* Reviews List */}
-      {reviews.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-gray-600 mb-4">
-            {t('common.reviews.noReviews')}
-          </p>
-          {!showForm && (
-            <Button
-              variant="primary"
-              onClick={() => {
-                if (!isLoggedIn) {
-                  alert(t('common.reviews.loginRequired'));
-                  return;
-                }
-                setShowForm(true);
-              }}
-            >
-              {t('common.reviews.writeReview')}
-            </Button>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {reviews.map((review) => (
-            <div key={review.id} className="border-b border-gray-200 pb-6 last:border-b-0">
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex-1">
-                  <div className="font-semibold text-gray-900 mb-1">
-                    {review.userName}
-                  </div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <svg
-                          key={star}
-                          className={`w-4 h-4 ${
-                            star <= review.rating
-                              ? 'text-yellow-400'
-                              : 'text-gray-300'
-                          }`}
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      ))}
-                    </div>
-                    <span className="text-sm text-gray-500">
-                      {formatDate(review.createdAt)}
-                    </span>
-                  </div>
-                </div>
-                {user && review.userId === user.id && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleEditReview(review)}
-                    className="ml-4"
-                  >
-                    Edit
-                  </Button>
-                )}
-              </div>
-              <p className="text-gray-700 whitespace-pre-wrap">{review.comment}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      <ReviewList
+        reviews={reviews}
+        currentUserId={user?.id}
+        showForm={showForm}
+        onEditReview={handleEditReview}
+        onShowForm={handleShowForm}
+        onLoginRequired={handleLoginRequired}
+      />
     </div>
   );
 }

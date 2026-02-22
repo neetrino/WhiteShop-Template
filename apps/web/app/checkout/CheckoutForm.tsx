@@ -3,21 +3,7 @@
 import { Card, Input } from '@shop/ui';
 import { UseFormRegister, UseFormSetValue, FieldErrors, UseFormWatch } from 'react-hook-form';
 import { useTranslation } from '../../lib/i18n-client';
-
-type CheckoutFormData = {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  shippingMethod: 'pickup' | 'delivery';
-  paymentMethod: 'idram' | 'arca' | 'cash_on_delivery';
-  shippingAddress?: string;
-  shippingCity?: string;
-  cardNumber?: string;
-  cardExpiry?: string;
-  cardCvv?: string;
-  cardHolderName?: string;
-};
+import { CheckoutFormData } from './types';
 
 interface CheckoutFormProps {
   register: UseFormRegister<CheckoutFormData>;

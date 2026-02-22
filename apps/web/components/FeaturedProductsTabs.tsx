@@ -5,6 +5,7 @@ import { apiClient } from '../lib/api-client';
 import { getStoredLanguage, type LanguageCode } from '../lib/language';
 import { ProductCard } from './ProductCard';
 import { t } from '../lib/i18n';
+import type { ProductLabel } from './ProductLabels';
 
 interface Product {
   id: string;
@@ -23,12 +24,7 @@ interface Product {
   attributes?: Record<string, Array<{ valueId?: string; value: string; label: string; imageUrl?: string | null; colors?: string[] | null }>>; // Other attributes (not color or size)
   originalPrice?: number | null;
   discountPercent?: number | null;
-  labels?: Array<{
-    type: string;
-    value: string;
-    position: string;
-    color?: string | null;
-  }>;
+  labels?: ProductLabel[];
 }
 
 interface ProductsResponse {

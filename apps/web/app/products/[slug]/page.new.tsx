@@ -2,23 +2,11 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { MouseEvent } from 'react';
-import { useRouter } from 'next/navigation';
-import { apiClient } from '../../../lib/api-client';
-import { formatPrice } from '../../../lib/currency';
-import { t, getProductText, getAttributeLabel } from '../../../lib/i18n';
-import { useAuth } from '../../../lib/auth/AuthContext';
-import { RelatedProducts } from '../../../components/RelatedProducts';
-import { ProductReviews } from '../../../components/ProductReviews';
-import { Heart, Maximize2 } from 'lucide-react';
-import { CompareIcon } from '../../../components/icons/CompareIcon';
-import { ProductLabels } from '../../../components/ProductLabels';
-import { processImageUrl } from '../../../lib/utils/image-utils';
-import type { ProductPageProps, Product, ProductVariant } from './types';
+import { t } from '../../../lib/i18n';
+import type { ProductPageProps, ProductVariant } from './types';
 import { WISHLIST_KEY, COMPARE_KEY } from './constants';
 import {
-  getColorValue,
   getOptionValue,
-  variantHasColor,
   findVariantByColorAndSize,
   findVariantByAllAttributes,
   switchToVariantImage,
@@ -28,8 +16,6 @@ import { useProductData } from './useProductData';
 import { useAttributeGroups } from './useAttributeGroups';
 
 export default function ProductPage({ params }: ProductPageProps) {
-  const router = useRouter();
-  const { isLoggedIn } = useAuth();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
@@ -53,18 +39,9 @@ export default function ProductPage({ params }: ProductPageProps) {
     isInCompare,
     slug,
     variantIdFromUrl,
-    setProduct,
-    setCurrentImageIndex: setCurrentImageIndexFromHook,
-    setThumbnailStartIndex: setThumbnailStartIndexFromHook,
     setIsInWishlist,
     setIsInCompare,
-    fetchProduct,
   } = useProductData({ params });
-
-  // Override setters from hook
-  useEffect(() => {
-    // Sync image index
-  }, []);
 
   const attributeGroups = useAttributeGroups({
     product,
@@ -107,10 +84,7 @@ export default function ProductPage({ params }: ProductPageProps) {
         product,
         selectedColor,
         selectedSize,
-        selectedAttributeValues,
-        variantHasColor,
-        getOptionValue,
-        findVariantByColorAndSize
+        selectedAttributeValues
       );
 
       if (newVariant && newVariant.id !== selectedVariant?.id) {
@@ -119,9 +93,7 @@ export default function ProductPage({ params }: ProductPageProps) {
           newVariant,
           product,
           images,
-          setCurrentImageIndex,
-          variantHasColor,
-          getOptionValue
+          setCurrentImageIndex
         );
 
         const colorValue = getOptionValue(newVariant.options, 'color');
@@ -138,9 +110,7 @@ export default function ProductPage({ params }: ProductPageProps) {
           newVariant,
           product,
           images,
-          setCurrentImageIndex,
-          variantHasColor,
-          getOptionValue
+          setCurrentImageIndex
         );
       }
     }
@@ -180,7 +150,7 @@ export default function ProductPage({ params }: ProductPageProps) {
 
   const currentVariant =
     selectedVariant ||
-    findVariantByColorAndSize(product, selectedColor, selectedSize, variantHasColor, getOptionValue) ||
+    findVariantByColorAndSize(product, selectedColor, selectedSize) ||
     product?.variants?.[0] ||
     null;
   const price = currentVariant?.price || 0;
@@ -275,8 +245,7 @@ export default function ProductPage({ params }: ProductPageProps) {
       images,
       selectedColor,
       setSelectedColor,
-      setCurrentImageIndex,
-      variantHasColor
+      setCurrentImageIndex
     );
   };
 

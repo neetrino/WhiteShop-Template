@@ -55,6 +55,16 @@ export interface ProductAttribute {
   };
 }
 
+export interface AttributeGroupValue {
+  valueId?: string;
+  value: string;
+  label: string;
+  stock: number;
+  variants: ProductVariant[];
+  imageUrl?: string | null;
+  colors?: string[] | null;
+}
+
 export interface Product {
   id: string;
   slug: string;

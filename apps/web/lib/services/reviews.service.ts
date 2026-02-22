@@ -1,5 +1,21 @@
 import { db } from "@white-shop/db";
+import { Prisma } from "@prisma/client";
 import { ensureProductReviewsTable } from "../utils/db-ensure";
+
+type ProductReviewWithUser = Prisma.ProductReviewGetPayload<{
+  include: {
+    user: {
+      select: {
+        id: true;
+        firstName: true;
+        lastName: true;
+        email: true;
+      };
+    };
+  };
+}>;
+
+type ReviewWithRating = { rating: number };
 
 class ReviewsService {
   /**
@@ -42,7 +58,7 @@ class ReviewsService {
     console.log(`✅ [REVIEWS SERVICE] Found ${reviews.length} reviews for product ${productId}`);
 
     // Format response to match frontend expectations
-    return reviews.map((review) => ({
+    return reviews.map((review: ProductReviewWithUser) => ({
       id: review.id,
       userId: review.userId,
       userName: review.user.firstName && review.user.lastName
@@ -133,14 +149,14 @@ class ReviewsService {
 
     const total = reviews.length;
     const average = total > 0
-      ? reviews.reduce((sum, r) => sum + r.rating, 0) / total
+      ? reviews.reduce((sum: number, r: ReviewWithRating) => sum + r.rating, 0) / total
       : 0;
 
     const distribution = [5, 4, 3, 2, 1].map((star) => ({
       star,
-      count: reviews.filter((r) => r.rating === star).length,
+      count: reviews.filter((r: ReviewWithRating) => r.rating === star).length,
       percentage: total > 0
-        ? (reviews.filter((r) => r.rating === star).length / total) * 100
+        ? (reviews.filter((r: ReviewWithRating) => r.rating === star).length / total) * 100
         : 0,
     }));
 

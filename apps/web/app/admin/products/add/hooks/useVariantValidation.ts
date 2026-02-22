@@ -71,13 +71,13 @@ export function useVariantValidation({
             if (colorSizes.length > 0) {
               for (const size of colorSizes) {
                 const stock = colorSizeStocks[size];
-                if (!stock || stock.trim() === '' || parseInt(stock) < 0) {
+                if (!stock || typeof stock !== 'string' || stock.trim() === '' || parseInt(stock) < 0) {
                   setLoading(false);
                   return false;
                 }
               }
             } else {
-              if (!colorDataItem.stock || colorDataItem.stock.trim() === '' || parseInt(colorDataItem.stock) < 0) {
+              if (!colorDataItem.stock || typeof colorDataItem.stock !== 'string' || colorDataItem.stock.trim() === '' || parseInt(colorDataItem.stock) < 0) {
                 setLoading(false);
                 return false;
               }
@@ -108,4 +108,6 @@ export function useVariantValidation({
 
   return { validateVariants };
 }
+
+
 

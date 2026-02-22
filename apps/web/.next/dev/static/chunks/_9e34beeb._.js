@@ -1912,7 +1912,7 @@ __turbopack_context__.s([
     ()=>useProductHandlers
 ]);
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/navigation.js [app-client] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/apps/web/lib/api-client.ts [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/apps/web/lib/api-client.ts [app-client] (ecmascript) <locals>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$i18n$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/apps/web/lib/i18n-client.ts [app-client] (ecmascript)");
 var _s = __turbopack_context__.k.signature();
 ;
@@ -1949,7 +1949,7 @@ function useProductHandlers({ products, setProducts, fetchProducts, selectedIds,
         setBulkDeleting(true);
         try {
             const ids = Array.from(selectedIds);
-            const results = await Promise.allSettled(ids.map((id)=>__TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiClient"].delete(`/api/v1/admin/products/${id}`)));
+            const results = await Promise.allSettled(ids.map((id)=>__TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["apiClient"].delete(`/api/v1/admin/products/${id}`)));
             const failed = results.filter((r)=>r.status === 'rejected');
             setSelectedIds(new Set());
             await fetchProducts();
@@ -1966,7 +1966,7 @@ function useProductHandlers({ products, setProducts, fetchProducts, selectedIds,
             return;
         }
         try {
-            await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiClient"].delete(`/api/v1/admin/products/${productId}`);
+            await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["apiClient"].delete(`/api/v1/admin/products/${productId}`);
             console.log('✅ [ADMIN] Product deleted successfully');
             // Refresh products list
             fetchProducts();
@@ -1986,7 +1986,7 @@ function useProductHandlers({ products, setProducts, fetchProducts, selectedIds,
                 published: newStatus
             };
             console.log(`🔄 [ADMIN] Updating product status to ${newStatus ? 'published' : 'draft'}`);
-            await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiClient"].put(`/api/v1/admin/products/${productId}`, updateData);
+            await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["apiClient"].put(`/api/v1/admin/products/${productId}`, updateData);
             console.log(`✅ [ADMIN] Product ${newStatus ? 'published' : 'unpublished'} successfully`);
             // Refresh products list
             fetchProducts();
@@ -2007,7 +2007,7 @@ function useProductHandlers({ products, setProducts, fetchProducts, selectedIds,
                 featured: newStatus
             };
             console.log(`⭐ [ADMIN] Updating product featured status to ${newStatus ? 'featured' : 'not featured'}`);
-            await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiClient"].put(`/api/v1/admin/products/${productId}`, updateData);
+            await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["apiClient"].put(`/api/v1/admin/products/${productId}`, updateData);
             console.log(`✅ [ADMIN] Product ${newStatus ? 'marked as featured' : 'removed from featured'} successfully`);
             // Refresh products list
             fetchProducts();
@@ -2023,7 +2023,7 @@ function useProductHandlers({ products, setProducts, fetchProducts, selectedIds,
         const newStatus = !allFeatured;
         setTogglingAllFeatured(true);
         try {
-            const results = await Promise.allSettled(products.map((product)=>__TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiClient"].put(`/api/v1/admin/products/${product.id}`, {
+            const results = await Promise.allSettled(products.map((product)=>__TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["apiClient"].put(`/api/v1/admin/products/${product.id}`, {
                     featured: newStatus
                 })));
             const failed = results.filter((r)=>r.status === 'rejected');
@@ -2073,7 +2073,7 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/navigation.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$auth$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/apps/web/lib/auth/AuthContext.tsx [app-client] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/apps/web/lib/api-client.ts [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/apps/web/lib/api-client.ts [app-client] (ecmascript) <locals>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$components$2f$AdminMenuDrawer$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/apps/web/components/AdminMenuDrawer.tsx [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$app$2f$admin$2f$admin$2d$menu$2e$config$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/apps/web/app/admin/admin-menu.config.tsx [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$i18n$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/apps/web/lib/i18n-client.ts [app-client] (ecmascript)");
@@ -2205,7 +2205,7 @@ function ProductsPage() {
         try {
             setCategoriesLoading(true);
             console.log('📂 [ADMIN] Fetching categories...');
-            const response = await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiClient"].get('/api/v1/admin/categories');
+            const response = await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["apiClient"].get('/api/v1/admin/categories');
             setCategories(response.data || []);
             console.log('✅ [ADMIN] Categories loaded:', response.data?.length || 0);
         } catch (err) {
@@ -2259,7 +2259,7 @@ function ProductsPage() {
             if (sortBy && sortBy.startsWith('createdAt')) {
                 params.sort = sortBy;
             }
-            const response = await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiClient"].get('/api/v1/admin/products', {
+            const response = await __TURBOPACK__imported__module__$5b$project$5d2f$apps$2f$web$2f$lib$2f$api$2d$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["apiClient"].get('/api/v1/admin/products', {
                 params
             });
             let filteredProducts = response.data || [];

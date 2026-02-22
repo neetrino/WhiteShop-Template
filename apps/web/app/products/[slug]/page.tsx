@@ -72,7 +72,9 @@ export default function ProductPage({ params }: ProductPageProps) {
       if (!isLoggedIn) {
         const stored = localStorage.getItem('shop_cart_guest');
         const cart = stored ? JSON.parse(stored) : [];
-        const existing = cart.find((i: any) => i.variantId === currentVariant.id);
+        const existing = cart.find((i: unknown): i is { variantId: string; quantity: number; productId?: string; productSlug?: string } => 
+          typeof i === 'object' && i !== null && 'variantId' in i && i.variantId === currentVariant.id
+        );
         if (existing) existing.quantity += quantity;
         else cart.push({ productId: product.id, productSlug: product.slug, variantId: currentVariant.id, quantity });
         localStorage.setItem('shop_cart_guest', JSON.stringify(cart));

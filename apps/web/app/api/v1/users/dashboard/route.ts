@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateToken } from "@/lib/middleware/auth";
 import { usersService } from "@/lib/services/users.service";
+import { toApiError } from "@/lib/types/errors";
+import { logger } from "@/lib/utils/logger";
 
 /**
  * GET /api/v1/users/dashboard
@@ -8,11 +10,11 @@ import { usersService } from "@/lib/services/users.service";
  */
 export async function GET(req: NextRequest) {
   try {
-    console.log("📊 [DASHBOARD] Request received");
+    logger.info("Dashboard request received");
     const user = await authenticateToken(req);
     
     if (!user) {
-      console.log("❌ [DASHBOARD] Unauthorized");
+      logger.warn("Dashboard unauthorized");
       return NextResponse.json(
         {
           type: "https://api.shop.am/problems/unauthorized",
@@ -25,23 +27,15 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    console.log(`✅ [DASHBOARD] User authenticated: ${user.id}`);
+    logger.debug("User authenticated", { userId: user.id });
     const result = await usersService.getDashboard(user.id);
-    console.log("✅ [DASHBOARD] Dashboard data retrieved successfully");
+    logger.info("Dashboard data retrieved successfully");
     
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error("❌ [DASHBOARD] Error:", error);
-    return NextResponse.json(
-      {
-        type: error.type || "https://api.shop.am/problems/internal-error",
-        title: error.title || "Internal Server Error",
-        status: error.status || 500,
-        detail: error.detail || error.message || "An error occurred",
-        instance: req.url,
-      },
-      { status: error.status || 500 }
-    );
+  } catch (error: unknown) {
+    logger.error("Dashboard error", { error });
+    const apiError = toApiError(error, req.url);
+    return NextResponse.json(apiError, { status: apiError.status || 500 });
   }
 }
 

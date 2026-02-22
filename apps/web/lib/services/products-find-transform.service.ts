@@ -68,30 +68,31 @@ class ProductsFindTransformService {
       console.log(`🎨 [PRODUCTS FIND TRANSFORM SERVICE] Processing ${variants.length} variants for product ${product.id} to collect colors`);
       
       // Process all variants to collect all unique colors
-      variants.forEach((v: any) => {
+      variants.forEach((v) => {
         // First, try to get ALL color options from variant.options (not just the first one)
         const options = Array.isArray(v.options) ? v.options : [];
-        const colorOptions = options.filter((opt: any) => {
+        const colorOptions = options.filter((opt: ProductWithRelations['variants'][number]['options'][number]) => {
           // Support both new format (AttributeValue) and old format (attributeKey/value)
-          if (opt.attributeValue) {
+          if ('attributeValue' in opt && opt.attributeValue) {
             return opt.attributeValue.attribute?.key === "color";
           }
           return opt.attributeKey === "color";
         });
         
         // Process all color options from this variant
-        colorOptions.forEach((colorOption: any) => {
+        colorOptions.forEach((colorOption: ProductWithRelations['variants'][number]['options'][number]) => {
           let colorValue = "";
           let imageUrl: string | null | undefined = null;
           let colorsHex: string[] | null | undefined = null;
           
-          if (colorOption.attributeValue) {
+          if ('attributeValue' in colorOption && colorOption.attributeValue) {
             // New format: get from translation or value
             const translation = colorOption.attributeValue.translations?.find((t: { locale: string }) => t.locale === lang) || colorOption.attributeValue.translations?.[0];
             colorValue = translation?.label || colorOption.attributeValue.value || "";
             // Get imageUrl and colors from AttributeValue
             imageUrl = colorOption.attributeValue.imageUrl || null;
-            colorsHex = colorOption.attributeValue.colors || null;
+            const colorsValue = colorOption.attributeValue.colors;
+            colorsHex = Array.isArray(colorsValue) && colorsValue.every((c): c is string => typeof c === 'string') ? colorsValue : null;
           } else {
             // Old format: use value directly
             colorValue = colorOption.value || "";
@@ -112,10 +113,13 @@ class ProductsFindTransformService {
         
         // Fallback: check variant.attributes JSONB column if options don't have color
         // This handles cases where colors are stored in JSONB but not in options
-        if (colorOptions.length === 0 && v.attributes && typeof v.attributes === 'object' && v.attributes.color) {
-          const colorAttributes = Array.isArray(v.attributes.color) ? v.attributes.color : [v.attributes.color];
-          colorAttributes.forEach((colorAttr: any) => {
-            const colorValue = colorAttr?.value || colorAttr;
+        if (colorOptions.length === 0 && v.attributes && typeof v.attributes === 'object' && !Array.isArray(v.attributes) && 'color' in v.attributes) {
+          const colorAttr = (v.attributes as { color?: unknown }).color;
+          const colorAttributes = Array.isArray(colorAttr) ? colorAttr : colorAttr ? [colorAttr] : [];
+          colorAttributes.forEach((colorAttrItem: unknown) => {
+            const colorValue = (colorAttrItem && typeof colorAttrItem === 'object' && 'value' in colorAttrItem) 
+              ? (colorAttrItem as { value?: unknown }).value 
+              : colorAttrItem;
             if (colorValue && typeof colorValue === 'string') {
               const normalizedValue = colorValue.trim().toLowerCase();
               // Only add if not already in colorMap
@@ -136,10 +140,12 @@ class ProductsFindTransformService {
       // Also check productAttributes for color attribute values with imageUrl and colors
       // IMPORTANT: Only update colors that already exist in variants (already in colorMap)
       // Do not add new colors that don't exist in variants
-      if ((product as any).productAttributes && Array.isArray((product as any).productAttributes)) {
-        (product as any).productAttributes.forEach((productAttr: any) => {
-          if (productAttr.attribute?.key === 'color' && productAttr.attribute?.values) {
-            productAttr.attribute.values.forEach((attrValue: any) => {
+      const productAttrs = product && 'productAttributes' in product && Array.isArray(product.productAttributes) ? product.productAttributes : [];
+      if (productAttrs.length > 0) {
+        productAttrs.forEach((productAttr: any) => {
+          const attr = productAttr?.attribute;
+          if (attr && typeof attr === 'object' && 'key' in attr && attr.key === 'color' && 'values' in attr && Array.isArray(attr.values)) {
+            attr.values.forEach((attrValue: { translations?: Array<{ locale: string; label?: string }>; value?: string; imageUrl?: string | null; colors?: string[] | null }) => {
               const translation = attrValue.translations?.find((t: { locale: string }) => t.locale === lang) || attrValue.translations?.[0];
               const colorValue = translation?.label || attrValue.value || "";
               if (colorValue) {

@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import type { Brand, Category, Attribute, Variant, ProductLabel, GeneratedVariant } from '../types';
-import type { CurrencyCode } from '../../../../lib/currency';
+import type { CurrencyCode } from '@/lib/currency';
 
 export function useProductFormState() {
   const [loading, setLoading] = useState(false);

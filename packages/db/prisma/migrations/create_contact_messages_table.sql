@@ -15,3 +15,8 @@ CREATE TABLE IF NOT EXISTS "contact_messages" (
 CREATE INDEX IF NOT EXISTS "contact_messages_createdAt_idx" ON "contact_messages"("createdAt" DESC);
 CREATE INDEX IF NOT EXISTS "contact_messages_email_idx" ON "contact_messages"("email");
 
+
+
+
+
+
